@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useCameraSession } from '@/features/camera/cameraSession';
 import { HandOverlay } from '@/features/camera/HandOverlay';
@@ -9,6 +9,8 @@ import { CalibrationChecklist } from './CalibrationChecklist';
 import { CameraErrorView } from './CameraErrorView';
 import { PermissionIntro } from './PermissionIntro';
 import { buildChecks } from './checks';
+import { ThumbsUpHint, ThumbsUpPreviewBadge } from './ThumbsUpHint';
+import { useThumbsUpHold } from './useThumbsUpHold';
 
 /** Decorative corner brackets that frame the live preview like a HUD viewport. */
 function FrameCorners() {
@@ -37,6 +39,19 @@ export function SetupPage() {
     [tracking.status, tracking.summary, luminance],
   );
   const allGood = checks.every((c) => c.state === 'pass');
+
+  // Both hands are busy during calibration, so a held thumbs-up also enters.
+  const getAspect = useCallback(() => {
+    const v = videoRef.current;
+    return v?.videoWidth && v.videoHeight ? v.videoWidth / v.videoHeight : 16 / 9;
+  }, []);
+  const enterWorkspace = useCallback(() => navigate('/workspace'), [navigate]);
+  const thumbsProgress = useThumbsUpHold(
+    tracking.latest,
+    getAspect,
+    tracking.status === 'ready',
+    enterWorkspace,
+  );
 
   useEffect(() => {
     const v = videoRef.current;
@@ -123,6 +138,7 @@ export function SetupPage() {
                     {tracking.summary.detectionMs.toFixed(1)} ms · {tracking.delegate}
                   </div>
                 )}
+                <ThumbsUpPreviewBadge progress={thumbsProgress} />
               </div>
               <div className="flex flex-wrap items-end gap-3">
                 <div className="w-full max-w-xs">
@@ -143,7 +159,8 @@ export function SetupPage() {
             <GlassPanel className="flex flex-col p-6">
               <h1 className="text-[18px] font-semibold tracking-tight">Calibrate</h1>
               <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-2">
-                Sit about an arm’s length from the screen and raise both hands.
+                Sit about an arm’s length from the screen and raise both hands. When the checks are
+                green, give a thumbs-up.
               </p>
               <div className="mt-6">
                 <CalibrationChecklist items={checks} />
@@ -161,11 +178,12 @@ export function SetupPage() {
                 <li>Keep your palms open and facing the camera to start.</li>
               </ul>
 
-              <div className="mt-auto flex flex-col gap-2 pt-8">
+              <div className="mt-auto flex flex-col gap-3 pt-8">
+                {tracking.status === 'ready' && <ThumbsUpHint progress={thumbsProgress} />}
                 <Button
                   variant={allGood ? 'primary' : 'secondary'}
                   size="lg"
-                  onClick={() => navigate('/workspace')}
+                  onClick={enterWorkspace}
                 >
                   {allGood ? 'Enter workspace' : 'Enter anyway'}
                 </Button>
