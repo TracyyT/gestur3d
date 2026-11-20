@@ -17,17 +17,17 @@ type Status = 'Live' | 'In progress' | 'Planned';
 const features: Array<{ title: string; body: string; status: Status }> = [
   {
     title: 'Two-hand tracking',
-    body: 'Up to two hands and 21 landmarks each, tracked at camera rate and smoothed for steady, low-latency control.',
+    body: '21 landmarks per hand, smoothed in real time.',
     status: 'Live',
   },
   {
-    title: 'Gestures trained from scratch',
-    body: 'Static and dynamic gesture classifiers trained on a purpose-built landmark dataset, then run in the browser with ONNX.',
+    title: 'Custom-trained gestures',
+    body: 'Trained from scratch. Run in your browser.',
     status: 'In progress',
   },
   {
     title: 'Private by design',
-    body: 'Camera frames are processed on your device. Nothing is uploaded, and the camera switches off when you leave.',
+    body: 'Processed on your device. Nothing is uploaded.',
     status: 'Live',
   },
 ];
@@ -36,17 +36,17 @@ const steps = [
   {
     n: '01',
     title: 'Allow the camera',
-    body: 'You’ll see exactly what it’s used for before the browser asks.',
+    body: 'Nothing is recorded.',
   },
   {
     n: '02',
     title: 'Calibrate',
-    body: 'A quick check for distance, lighting and both hands in frame.',
+    body: 'Distance, lighting, both hands.',
   },
   {
     n: '03',
     title: 'Reach in',
-    body: 'Pinch to grab, turn your wrist to rotate, spread two hands to scale.',
+    body: 'Grab, rotate, scale.',
   },
 ];
 
@@ -118,7 +118,7 @@ export function LandingPage() {
               className="mb-5 inline-flex items-center gap-2 text-[12px] tracking-[0.2em] text-ink-3 uppercase"
             >
               <span className="h-px w-6 bg-holo-cyan/60" />
-              Spatial interface · runs in your browser
+              Spatial interface
             </motion.p>
             <motion.h1
               variants={fadeUp}
@@ -138,8 +138,7 @@ export function LandingPage() {
               custom={2}
               className="mt-6 max-w-md text-[16px] leading-relaxed text-ink-2"
             >
-              Gestur3D turns your webcam into a spatial controller. Grab, rotate and scale
-              holographic objects, draw in the air, and trigger effects. No headset, no install.
+              No headset. Just your webcam.
             </motion.p>
             <motion.div
               variants={fadeUp}
@@ -227,7 +226,7 @@ export function LandingPage() {
       </section>
 
       <footer className="relative z-10 mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 border-t border-line px-6 py-8 text-[12.5px] text-ink-3 md:px-10">
-        <span>Gestur3D · hand tracking and gesture models run locally</span>
+        <span>Gestur3D</span>
         <a href={REPO_URL} target="_blank" rel="noreferrer" className="hover:text-ink-1">
           Source on GitHub
         </a>
