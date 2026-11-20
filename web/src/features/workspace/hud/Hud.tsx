@@ -4,7 +4,9 @@ import { IconButton } from '@/ui';
 import { CameraPreview } from './CameraPreview';
 import { ObjectsPanel } from './ObjectsPanel';
 import { SettingsPanel } from './SettingsPanel';
+import { HandStatus } from './HandStatus';
 import { StatusCluster } from './StatusCluster';
+import { TrackingPanel } from './TrackingPanel';
 
 /** Workspace overlay: status readouts, side panels and the camera preview. */
 export function Hud() {
@@ -13,6 +15,9 @@ export function Hud() {
   return (
     <>
       <div className="pointer-events-none absolute top-4 right-4 z-20 flex items-center gap-2">
+        <div className="pointer-events-auto hidden lg:block">
+          <HandStatus />
+        </div>
         <div className="pointer-events-auto">
           <StatusCluster />
         </div>
@@ -49,6 +54,7 @@ export function Hud() {
             className="absolute top-[68px] right-4 bottom-20 z-20 flex w-[296px] flex-col gap-3 overflow-y-auto pb-2"
           >
             <ObjectsPanel />
+            <TrackingPanel />
             <SettingsPanel />
           </motion.aside>
         )}
