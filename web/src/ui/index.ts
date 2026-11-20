@@ -9,3 +9,4 @@ export { StatusPill, type StatusPillProps, type StatusTone } from './StatusPill'
 export { Kbd } from './Kbd';
 export { cn } from './cn';
 export { palette } from './theme';
+export { Logo } from './Logo';

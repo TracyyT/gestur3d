@@ -6,7 +6,7 @@ import { supportsWebGL2 } from '@/lib/webgl';
 import { useSettings } from '@/stores/settings';
 import { buttonClasses } from '@/ui';
 import { HeroFallback } from './HeroFallback';
-import { Logo } from './Logo';
+import { Logo } from '@/ui/Logo';
 
 const HeroScene = lazy(() => import('./HeroScene'));
 
