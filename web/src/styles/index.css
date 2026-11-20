@@ -1,4 +1,7 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+@import './tokens.css';
 
 html,
 body,
@@ -8,6 +11,40 @@ body,
 
 body {
   margin: 0;
-  background: #05060a;
+  background: var(--color-void);
+  color: var(--color-ink-1);
+  font-family: var(--font-sans);
   color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-holo-cyan) 35%, transparent);
+  color: var(--color-ink-1);
+}
+
+:focus-visible {
+  outline: 1.5px solid var(--color-holo-cyan);
+  outline-offset: 2px;
+}
+
+/* Reduced motion: honored for both the OS preference and the in-app setting. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:root[data-reduced-motion='true'] *,
+:root[data-reduced-motion='true'] *::before,
+:root[data-reduced-motion='true'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
 }
