@@ -18,6 +18,8 @@ interface G3D {
     to: UV;
     handedness?: 'Left' | 'Right';
     dropoutMs?: number;
+    grip?: number;
+    loosenTo?: number;
   }): Promise<void>;
   playSweep(from: UV, to: UV, handedness?: 'Left' | 'Right'): Promise<void>;
   playHold(uv: UV, ms: number, jitter?: number): Promise<void>;
@@ -188,6 +190,25 @@ test('a long dropout releases the object in place; it does not jump to the retur
     for (const s of samples.slice(firstLost))
       expect(s.pos, JSON.stringify(samples)).toEqual(samples[firstLost]!.pos);
   }
+});
+
+test('a light real-hand pinch grabs, and a grip that loosens mid-move keeps carrying', async ({
+  page,
+}) => {
+  await open(page, 1440, 900, true);
+  const from = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
+  const to = { u: 0.25, v: 0.3 };
+  // grip 0.72 ≈ ratio 0.38 (fingertips touching on a real hand), loosening to
+  // 0.5 ≈ ratio 0.64 halfway. The old thresholds never grabbed this and would
+  // have frozen the object as soon as the grip loosened.
+  await page.evaluate(
+    ([from, to]) => window.__G3D__.playGrab({ from, to, grip: 0.72, loosenTo: 0.5 }),
+    [from, to] as const,
+  );
+  const end = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
+  expect(Math.abs(end.u - to.u)).toBeLessThan(0.01);
+  expect(Math.abs(end.v - to.v)).toBeLessThan(0.01);
+  expect(await page.evaluate(() => window.__G3D__.pointers().some((p) => p.grabbedId))).toBe(false);
 });
 
 test('a closed pinch swept across an object does not grab it', async ({ page }) => {

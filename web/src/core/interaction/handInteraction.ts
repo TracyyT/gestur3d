@@ -28,6 +28,8 @@ export interface HandPointer {
   phase: PointerPhase;
   screen: ScreenPos;
   pinchStrength: number;
+  /** Smoothed thumb-index / palm ratio, for calibration readouts. */
+  pinchRatio: number;
   hoverId: string | null;
   grabbedId: string | null;
   /** When this pointer last released an object (for the release ripple). */
@@ -212,6 +214,7 @@ export class HandInteractionEngine {
       phase,
       screen: input.screen,
       pinchStrength: input.pinch.strength,
+      pinchRatio: input.pinch.ratio,
       hoverId,
       grabbedId: m.grab?.objectId ?? null,
       releasedAt: m.releasedAt,
