@@ -16,7 +16,9 @@ import {
   type ShaderMaterial,
 } from 'three';
 import type { InputSource, ObjectKind, SceneObject, Vec3 } from '@/core/interaction/commands';
+import { handRuntime } from '@/features/hands/handRuntime';
 import { createHoloMaterial } from '@/scene/materials/holoMaterial';
+import { objectRegistry } from '@/scene/objectRegistry';
 import { FLOOR_Y } from '@/scene/constants';
 import { useScene } from '@/stores/scene';
 import { palette } from '@/ui/theme';
@@ -102,17 +104,28 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
     [material, kindBody, edges],
   );
 
+  // Register the pickable mesh so hands can raycast against it.
+  useEffect(() => {
+    // The body mesh is the group's first child (see JSX below).
+    const mesh = group.current?.children[0];
+    if (!mesh) return;
+    objectRegistry.set(object.id, mesh);
+    return () => objectRegistry.delete(object.id);
+  }, [object.id]);
+
   // Ease the rendered transform toward the model so input feels smooth.
   useFrame((state, delta) => {
     const g = group.current;
     if (!g) return;
     const [px, py, pz] = object.position;
+    const handHeld = handRuntime.held.has(object.id);
     if (instant) {
       g.position.set(px, py, pz);
       g.rotation.set(...object.rotation);
       g.scale.setScalar(object.scale);
     } else {
-      easing.damp3(g.position, object.position, 0.08, delta);
+      // Hands already arrive smoothed; keep the object tight to the hand cursor.
+      easing.damp3(g.position, object.position, handHeld ? 0.03 : 0.08, delta);
       easing.dampE(g.rotation, object.rotation, 0.1, delta);
       easing.damp3(g.scale, [object.scale, object.scale, object.scale], 0.1, delta);
     }
@@ -120,7 +133,8 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
     const m = body.current?.material as ShaderMaterial | undefined;
     if (m?.uniforms.uTime && m.uniforms.uHighlight) {
       m.uniforms.uTime.value = state.clock.elapsedTime;
-      const target = selected ? 1 : hovered.current ? 0.45 : 0;
+      const handHover = handRuntime.hovered.has(object.id);
+      const target = handHeld ? 1.5 : selected ? 1 : hovered.current || handHover ? 0.45 : 0;
       m.uniforms.uHighlight.value +=
         (target - m.uniforms.uHighlight.value) * Math.min(1, delta * 10);
     }
@@ -143,6 +157,8 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (e.button !== 0) return;
     e.stopPropagation();
+    // A hand is holding this object; the mouse waits its turn.
+    if (handRuntime.held.has(object.id)) return;
     (e.target as unknown as Element).setPointerCapture?.(e.pointerId);
     dispatch({ type: 'select', id: object.id }, SOURCE);
 
@@ -160,6 +176,7 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
       lastY: e.clientY,
     };
     setOrbitEnabled(false);
+    handRuntime.mouseDragId = object.id;
     setMode(e.shiftKey ? 'rotating' : 'moving', SOURCE);
   };
 
@@ -187,6 +204,7 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
     if (!d || d.pointerId !== e.pointerId) return;
     (e.target as unknown as Element).releasePointerCapture?.(e.pointerId);
     drag.current = null;
+    if (handRuntime.mouseDragId === object.id) handRuntime.mouseDragId = null;
     setOrbitEnabled(true);
     setMode('selecting', SOURCE);
   };
