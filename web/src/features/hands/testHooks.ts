@@ -126,6 +126,30 @@ export function installTestHooks() {
     },
     play,
     playGrab: (script: GrabScript) => play(grabRecording(script), script.speed),
+    /** A pinch closed over empty space, then swept across `to` (must not grab). */
+    playSweep: (from: UV, to: UV, handedness: Handedness = 'Right') => {
+      const k = (at: number, uv: UV, pinch: number): Keyframe => {
+        const [cx, cy] = wristAt(uv, pinch, handedness);
+        return { at, cx, cy, pinch };
+      };
+      return play(
+        scriptedRecording(
+          [
+            k(0, from, 0),
+            k(300, from, 0),
+            k(450, from, 1),
+            k(700, from, 1),
+            k(1400, to, 1),
+            k(1700, to, 1),
+            k(1850, to, 0),
+            k(2100, to, 0),
+          ],
+          {
+            handedness,
+          },
+        ),
+      );
+    },
     /** Hold one hand still and open at a UV for `ms` (jitter / idle checks). */
     playHold: (uv: UV, ms: number, jitter = 0, handedness: Handedness = 'Right') => {
       const [cx, cy] = wristAt(uv, 0, handedness);
