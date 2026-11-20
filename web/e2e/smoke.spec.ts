@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('landing page links to camera setup', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Gestur3D');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Shape light');
   await page.getByRole('link', { name: /launch workspace/i }).click();
   await expect(page).toHaveURL(/\/setup$/);
 });
