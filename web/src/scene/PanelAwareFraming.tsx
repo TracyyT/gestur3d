@@ -2,38 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import type { PerspectiveCamera } from 'three';
 import { useHudLayout } from '@/stores/hudLayout';
-
-/** Width the side panels cover on the right edge (296 px panel + 16 px margin). */
-export const PANEL_COVER_PX = 312;
-/** Below this width the panels overlay the scene anyway; don't reframe. */
-const MIN_WIDTH_PX = 900;
-/**
- * On-screen width the default object layout needs, as a multiple of the
- * viewport height (vertical FOV is fixed, so horizontal size scales with
- * height). Objects span about ±2.6 world units at ~7.7 units from the camera
- * with a 42° FOV: ≈ 0.88 × height, plus margin.
- */
-const CONTENT_WIDTH_PER_HEIGHT = 1.0;
-const MIN_ZOOM = 0.55;
-
-export interface Framing {
-  /** Horizontal projection shift in px (positive moves the scene left). */
-  offsetX: number;
-  /** Camera zoom (< 1 zooms out so the layout fits the free width). */
-  zoom: number;
-}
-
-/**
- * Where the scene should sit: centered in the area left of the panels, and
- * zoomed out just enough for the default layout to fit. Pure for testing.
- */
-export function computeFraming(panelsVisible: boolean, width: number, height: number): Framing {
-  const reframe = panelsVisible && width >= MIN_WIDTH_PX;
-  const free = reframe ? width - PANEL_COVER_PX : width;
-  const needed = height * CONTENT_WIDTH_PER_HEIGHT;
-  const zoom = Math.min(1, Math.max(MIN_ZOOM, free / needed));
-  return { offsetX: reframe ? PANEL_COVER_PX / 2 : 0, zoom };
-}
+import { computeFraming, type Framing } from './framing';
 
 /**
  * Applies `computeFraming` by shifting the camera's projection
