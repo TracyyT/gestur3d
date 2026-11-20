@@ -27,13 +27,20 @@ const MODELS = [
   },
 ];
 
+/**
+ * FilesetResolver.forVisionTasks(base) without `useModule` loads exactly these
+ * two files; the package's *_module_internal variant (another ~15 MB) is unused.
+ */
+const WASM_FILES = ['vision_wasm_internal.js', 'vision_wasm_internal.wasm'];
+
 async function copyWasm() {
   // pnpm links the package into web/node_modules; its exports map hides package.json.
   const pkgDir = join(here, '..', 'node_modules', '@mediapipe', 'tasks-vision');
   const target = join(outDir, 'wasm');
   await rm(target, { recursive: true, force: true });
-  await cp(join(pkgDir, 'wasm'), target, { recursive: true });
-  console.log('[models] copied MediaPipe wasm runtime');
+  await mkdir(target, { recursive: true });
+  await Promise.all(WASM_FILES.map((f) => cp(join(pkgDir, 'wasm', f), join(target, f))));
+  console.log(`[models] copied MediaPipe wasm runtime (${WASM_FILES.length} files)`);
 }
 
 async function download({ file, url }) {
