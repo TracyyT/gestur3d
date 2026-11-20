@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cameraToScreen, interactionBox, screenToNdc } from './handMapping';
+import { cameraToScreen, interactionBox, screenToCamera, screenToNdc } from './handMapping';
 
 const CAM = 16 / 9;
 const PANEL = 312;
@@ -97,5 +97,21 @@ describe('screenToNdc', () => {
     expect(screenToNdc(0, 0, 1000, 500)).toEqual([-1, 1]);
     expect(screenToNdc(1000, 500, 1000, 500)).toEqual([1, -1]);
     expect(screenToNdc(500, 250, 1000, 500)).toEqual([0, -0]);
+  });
+});
+
+describe('screenToCamera', () => {
+  it('inverts cameraToScreen', () => {
+    const rect = { left: 0, top: 0, width: 1128, height: 900 };
+    const box = interactionBox(0.7, 16 / 9, rect.width / rect.height);
+    for (const [u, v] of [
+      [0.1, 0.2],
+      [0.5, 0.5],
+      [0.9, 0.75],
+    ] as const) {
+      const p = cameraToScreen(screenToCamera(u, v, box), box, rect);
+      expect(p.u).toBeCloseTo(u);
+      expect(p.v).toBeCloseTo(v);
+    }
   });
 });
