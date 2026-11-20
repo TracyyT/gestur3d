@@ -1,6 +1,7 @@
 import type { Recording } from '@/core/vision/recording';
 import { toRecordedFrame } from '@/core/vision/recording';
 import type { Handedness } from '@/core/vision/types';
+import { anchorPoint, type AnchorMode } from './handTracker';
 import { synthHand } from './synthetic';
 
 /**
@@ -67,4 +68,29 @@ export function scriptedRecording(keys: Keyframe[], opts: ScriptOptions = {}): R
     label,
     frames,
   };
+}
+
+/**
+ * Wrist position that puts the hand's cursor anchor at `target` (raw camera
+ * coordinates) for a given pinch amount, so scripts can aim at screen points.
+ */
+export function wristForAnchor(
+  target: readonly [number, number],
+  {
+    pinch = 0,
+    handedness = 'Right',
+    size = 0.12,
+    aspect = 16 / 9,
+    mode = 'blend',
+  }: {
+    pinch?: number;
+    handedness?: Handedness;
+    size?: number;
+    aspect?: number;
+    mode?: AnchorMode;
+  } = {},
+): [number, number] {
+  const probe = synthHand({ cx: 0.5, cy: 0.5, pinch, handedness, size, aspect });
+  const a = anchorPoint(probe.image, mode);
+  return [target[0] - (a[0] - 0.5), target[1] - (a[1] - 0.5)];
 }
