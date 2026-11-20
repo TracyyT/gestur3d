@@ -97,6 +97,14 @@ describe('pinch', () => {
     expect(e.ended).toBe(true);
   });
 
+  it('flags "releasing" between the enter and exit thresholds while pinched', () => {
+    const th = sensitivityToThresholds(0.5);
+    const d = new PinchDetector(th);
+    d.update(0.1, 0);
+    expect(d.update(0.1, th.minHoldMs).releasing).toBe(false);
+    expect(d.update((th.enter + th.exit) / 2, 100).releasing).toBe(true);
+  });
+
   it('a single closed frame does not trigger', () => {
     const th = sensitivityToThresholds(0.5);
     const d = new PinchDetector(th);

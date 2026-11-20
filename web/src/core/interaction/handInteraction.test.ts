@@ -81,6 +81,21 @@ describe('HandInteractionEngine', () => {
     expect(r.held.size).toBe(0);
   });
 
+  it('holds the object still while the fingers open to release', () => {
+    const e = new HandInteractionEngine();
+    const s = scene({ a: [2, 1, 0] });
+    e.update(0, [hand(200, 100, OPEN)], s, never);
+    e.update(33, [hand(200, 100, START)], s, never);
+    const opening = e.update(
+      66,
+      [hand(260, 130, pinch({ active: true, releasing: true, strength: 0.6 }))],
+      s,
+      never,
+    );
+    expect(opening.commands).toHaveLength(0);
+    expect(opening.pointers[0]!.phase).toBe('grabbing');
+  });
+
   it('does not snap the object to the cursor at grab start', () => {
     const e = new HandInteractionEngine();
     const s = scene({ a: [2, 1, 0] });
@@ -109,6 +124,25 @@ describe('HandInteractionEngine', () => {
     const r = e.update(0, [hand(200, 100, HOLD)], scene({ a: [2, 1, 0] }), never);
     expect(r.pointers[0]!.phase).toBe('pinching');
     expect(r.held.size).toBe(0);
+  });
+
+  it('a hand that appears with fingers closed (not yet debounced) cannot grab until it opens', () => {
+    const e = new HandInteractionEngine();
+    const s = scene({ a: [2, 1, 0] });
+    e.update(0, [hand(200, 100, pinch({ closed: true, strength: 1 }))], s, never);
+    // Debounce completes: a "start" edge arrives, but the hand never opened.
+    const r = e.update(
+      66,
+      [hand(200, 100, pinch({ active: true, started: true, closed: true, strength: 1 }))],
+      s,
+      never,
+    );
+    expect(r.held.size).toBe(0);
+    expect(r.pointers[0]!.phase).toBe('pinching');
+    // After opening and pinching again, it grabs.
+    e.update(100, [hand(200, 100, END)], s, never);
+    e.update(133, [hand(200, 100, OPEN)], s, never);
+    expect(e.update(166, [hand(200, 100, START)], s, never).held.get('a')).toBe(1);
   });
 
   it('freezes a held object while tracking is lost, then continues', () => {

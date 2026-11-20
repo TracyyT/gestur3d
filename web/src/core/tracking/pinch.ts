@@ -56,6 +56,14 @@ export interface PinchState {
   started: boolean;
   /** True on the update where `active` became false. */
   ended: boolean;
+  /**
+   * Still pinched, but the fingers have opened past the start threshold
+   * (between enter and exit). The user is letting go: held objects should
+   * stop following, so release can't nudge them.
+   */
+  releasing?: boolean;
+  /** Fingers are closed right now (ratio below the start threshold), before debouncing. */
+  closed?: boolean;
 }
 
 /** Turns a noisy pinch ratio into a debounced, hysteretic on/off signal. */
@@ -91,7 +99,8 @@ export class PinchDetector {
       this.closedSince = null;
       ended = true;
     }
-    return { strength, active: this.active, started, ended };
+    const releasing = this.active && ratio > enter;
+    return { strength, active: this.active, started, ended, releasing, closed: ratio < enter };
   }
 
   reset() {

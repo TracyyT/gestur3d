@@ -62,7 +62,9 @@ export interface HandTrackerOptions {
 export const DEFAULT_TRACKER_OPTIONS: HandTrackerOptions = {
   smoothing: 0.5,
   sensitivity: 0.5,
-  anchorMode: 'blend',
+  // Knuckles don't move when the pinch opens or closes, so grabbing and
+  // releasing can't nudge the object (the pinch/blend anchors drift).
+  anchorMode: 'knuckle',
   lostGraceMs: 300,
 };
 
