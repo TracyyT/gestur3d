@@ -48,3 +48,4 @@ ml/data/processed/
 # large model artifacts are fetched or exported, not committed
 *.onnx
 !web/public/models/gestures/*.onnx
+web/public/models/mediapipe/
