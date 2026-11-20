@@ -110,8 +110,13 @@ export class HandInteractionEngine {
     for (const input of inputs) {
       let m = this.memory.get(input.id);
       if (!m) {
-        // A hand that appears mid-pinch must open before it can grab.
-        m = { grab: null, emptyPinch: input.pinch.active, releasedAt: null };
+        // A hand that appears mid-pinch must open before it can grab. Check the
+        // raw closed state too: the debounced `active` lags the first frames.
+        m = {
+          grab: null,
+          emptyPinch: input.pinch.active || !!input.pinch.closed,
+          releasedAt: null,
+        };
         this.memory.set(input.id, m);
       }
 
@@ -130,7 +135,11 @@ export class HandInteractionEngine {
           pointers.push(this.pointer(input, hoverId ? 'hovering' : 'tracking', hoverId, m));
           continue;
         }
-        const hit = scene.planePoint(input.screen, m.grab.planeOrigin);
+        // Fingers opening (still pinched, past the start threshold): hold the
+        // object still so letting go never drags it.
+        const hit = input.pinch.releasing
+          ? null
+          : scene.planePoint(input.screen, m.grab.planeOrigin);
         if (hit) {
           const next: Vec3 = [
             hit[0] + m.grab.offset[0],
@@ -152,7 +161,7 @@ export class HandInteractionEngine {
       }
 
       if (m.emptyPinch) {
-        if (!input.pinch.active) m.emptyPinch = false;
+        if (!input.pinch.active && !input.pinch.closed) m.emptyPinch = false;
         else {
           pointers.push(this.pointer(input, 'pinching', hoverId, m));
           continue;

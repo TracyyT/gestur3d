@@ -62,7 +62,9 @@ export interface HandTrackerOptions {
 export const DEFAULT_TRACKER_OPTIONS: HandTrackerOptions = {
   smoothing: 0.5,
   sensitivity: 0.5,
-  anchorMode: 'blend',
+  // Knuckles don't move when the pinch opens or closes, so grabbing and
+  // releasing can't nudge the object (the pinch/blend anchors drift).
+  anchorMode: 'knuckle',
   lostGraceMs: 300,
 };
 
@@ -122,6 +124,9 @@ export class HandTracker {
   /** Feed one detection frame. `aspect` = camera width / height. */
   update(frame: HandFrame, aspect: number): TrackSnapshot[] {
     const now = frame.timestamp;
+    // Grace is measured in frame time: a hand gone longer than the grace
+    // period can't be re-matched, however late this frame is processed.
+    this.expire(now);
     const detections = frame.hands.map((hand) => ({
       hand,
       raw: anchorPoint(hand.image, this.options.anchorMode),

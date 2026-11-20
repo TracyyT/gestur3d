@@ -97,6 +97,14 @@ describe('pinch', () => {
     expect(e.ended).toBe(true);
   });
 
+  it('flags "releasing" between the enter and exit thresholds while pinched', () => {
+    const th = sensitivityToThresholds(0.5);
+    const d = new PinchDetector(th);
+    d.update(0.1, 0);
+    expect(d.update(0.1, th.minHoldMs).releasing).toBe(false);
+    expect(d.update((th.enter + th.exit) / 2, 100).releasing).toBe(true);
+  });
+
   it('a single closed frame does not trigger', () => {
     const th = sensitivityToThresholds(0.5);
     const d = new PinchDetector(th);
@@ -159,6 +167,15 @@ describe('HandTracker', () => {
     tr.update(frame(233), A);
     expect(tr.expire(500)).toHaveLength(1);
     expect(tr.expire(600)).toHaveLength(0);
+  });
+
+  it('a hand gone longer than the grace period is not re-matched, even without expire()', () => {
+    const tr = new HandTracker({ lostGraceMs: 300 });
+    const [first] = tr.update(frame(0, synthHand({ cx: 0.5, cy: 0.7 })), A);
+    tr.update(frame(33), A);
+    const back = tr.update(frame(600, synthHand({ cx: 0.5, cy: 0.7 })), A);
+    expect(back).toHaveLength(1);
+    expect(back[0]!.id).not.toBe(first!.id);
   });
 
   it('treats an implausible jump as a different hand', () => {
