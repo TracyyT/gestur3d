@@ -1,7 +1,7 @@
 import type { Command, ObjectKind, SceneModel, SceneObject, Vec3 } from './commands';
 
 export const SCALE_MIN = 0.3;
-export const SCALE_MAX = 3.5;
+export const SCALE_MAX = 3;
 /** Objects stay inside this box so nothing can be flung out of reach. */
 export const BOUNDS = { x: 4.5, yMin: -0.6, yMax: 3, z: 3.5 } as const;
 export const MAX_OBJECTS = 24;
@@ -26,9 +26,9 @@ export const KIND_LABEL: Record<ObjectKind, string> = {
 
 export function createInitialScene(): SceneModel {
   const objects: SceneObject[] = [
-    { id: 'obj-1', kind: 'sphere', position: [-1.9, 0.6, 0], rotation: [0, 0, 0], scale: 1 },
-    { id: 'obj-2', kind: 'cube', position: [0, 0.6, -0.4], rotation: [0.35, 0.6, 0], scale: 1 },
-    { id: 'obj-3', kind: 'sculpture', position: [1.9, 0.6, 0], rotation: [0, 0, 0], scale: 1 },
+    { id: 'obj-1', kind: 'sphere', position: [-1.9, 0.25, 0], rotation: [0, 0, 0], scale: 1 },
+    { id: 'obj-2', kind: 'cube', position: [0, 0.25, -0.4], rotation: [0.35, 0.6, 0], scale: 1 },
+    { id: 'obj-3', kind: 'sculpture', position: [1.9, 0.25, 0], rotation: [0, 0, 0], scale: 1 },
   ];
   return { objects, selectedId: null, nextId: 4 };
 }
@@ -46,7 +46,7 @@ function update(model: SceneModel, id: string, fn: (o: SceneObject) => SceneObje
 /** Spawn point for new objects: front and center, nudged so they don't stack exactly. */
 function spawnPosition(model: SceneModel): Vec3 {
   const n = model.objects.length;
-  return clampPosition([((n % 5) - 2) * 0.35, 0.9 + (n % 3) * 0.2, 0.6]);
+  return clampPosition([((n % 5) - 2) * 0.35, 0.5 + (n % 3) * 0.2, 0.6]);
 }
 
 /** Pure scene reducer. Returns the same object when nothing changed. */
