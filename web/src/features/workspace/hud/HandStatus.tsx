@@ -79,8 +79,9 @@ export function HandStatus() {
       role="group"
       aria-label="Hands"
     >
-      <HandChip side="Right" pointer={right} />
+      {/* Left hand on the left, right hand on the right, as you see them in the mirrored view. */}
       <HandChip side="Left" pointer={left} />
+      <HandChip side="Right" pointer={right} />
     </div>
   );
 }
