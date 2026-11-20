@@ -1,0 +1,48 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+interface HudLayoutState {
+  /** Camera preview top-left corner, px from the viewport's top-left. null = default spot. */
+  previewPos: { x: number; y: number } | null;
+  previewCollapsed: boolean;
+  panelsVisible: boolean;
+  setPreviewPos: (pos: { x: number; y: number } | null) => void;
+  setPreviewCollapsed: (v: boolean) => void;
+  setPanelsVisible: (v: boolean) => void;
+}
+
+/** Where the user put HUD pieces. Persisted so the workspace feels like theirs. */
+export const useHudLayout = create<HudLayoutState>()(
+  persist(
+    (set) => ({
+      previewPos: null,
+      previewCollapsed: false,
+      panelsVisible: true,
+      setPreviewPos: (previewPos) => set({ previewPos }),
+      setPreviewCollapsed: (previewCollapsed) => set({ previewCollapsed }),
+      setPanelsVisible: (panelsVisible) => set({ panelsVisible }),
+    }),
+    {
+      name: 'gestur3d.hud',
+      version: 1,
+      partialize: ({ previewPos, previewCollapsed, panelsVisible }) => ({
+        previewPos,
+        previewCollapsed,
+        panelsVisible,
+      }),
+    },
+  ),
+);
+
+/** Keep a box of size w×h fully inside a viewport of size vw×vh with a margin. */
+export function clampToViewport(
+  pos: { x: number; y: number },
+  size: { w: number; h: number },
+  viewport: { w: number; h: number },
+  margin = 12,
+) {
+  return {
+    x: Math.min(Math.max(margin, pos.x), Math.max(margin, viewport.w - size.w - margin)),
+    y: Math.min(Math.max(margin, pos.y), Math.max(margin, viewport.h - size.h - margin)),
+  };
+}

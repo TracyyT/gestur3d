@@ -49,3 +49,34 @@ test.describe('workspace keyboard controls', () => {
     await expect(announcer).toContainText('Cube selected');
   });
 });
+
+test.describe('workspace panels', () => {
+  test('adding an object from the Objects panel selects it', async ({ page }) => {
+    await page.goto('/workspace');
+    const announcer = page.locator('[aria-live="polite"]').first();
+    await page.getByRole('button', { name: 'Add sphere' }).click();
+    await expect(announcer).toContainText('Sphere 2 selected');
+    await expect(
+      page.getByRole('list', { name: 'Objects in the scene' }).getByRole('listitem'),
+    ).toHaveCount(4);
+  });
+
+  test('panels can be hidden and shown', async ({ page }) => {
+    await page.goto('/workspace');
+    const panels = page.getByRole('complementary', { name: 'Workspace panels' });
+    await expect(panels).toBeVisible();
+    await page.getByRole('button', { name: 'Hide panels' }).click();
+    await expect(panels).toBeHidden();
+    await page.getByRole('button', { name: 'Show panels' }).click();
+    await expect(panels).toBeVisible();
+  });
+
+  test('settings persist across reloads', async ({ page }) => {
+    await page.goto('/workspace');
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByLabel('Visual quality').selectOption('low');
+    await page.reload();
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByLabel('Visual quality')).toHaveValue('low');
+  });
+});

@@ -4,6 +4,7 @@ import { objectLabel } from '@/core/interaction/sceneModel';
 import { supportsWebGL2 } from '@/lib/webgl';
 import { useScene } from '@/stores/scene';
 import { GlassPanel, Kbd, Logo } from '@/ui';
+import { Hud } from './hud/Hud';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { useWorkspaceKeyboard } from './useWorkspaceKeyboard';
 
@@ -63,6 +64,7 @@ export function WorkspacePage() {
       </div>
 
       <SelectionAnnouncer />
+      <Hud />
 
       <header className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-4">
         <Link
