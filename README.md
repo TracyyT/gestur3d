@@ -2,12 +2,17 @@
 
 **A holographic 3D workspace you control with your hands through a webcam.** Grab, rotate and scale floating objects, draw in the air, and trigger effects with gestures. Hand tracking runs locally in the browser. The gesture classifiers are trained from scratch in PyTorch on a purpose-built landmark dataset and run in the browser via ONNX.
 
-> **Status: Milestone 1 (Foundation) complete.** The landing page, camera setup with live hand detection, and a 3D workspace with full mouse and keyboard control all work. Gesture control starts in Milestone 2. See the [roadmap](#roadmap).
+> **Status: Milestone 2 (hand tracking and manipulation) complete.** Pinch to grab, move and release objects with either hand, with mouse and keyboard as a full fallback. Two-hand scaling and rotation come in Milestone 3. See the [roadmap](#roadmap).
 
 ## What works today
 
 - **Landing page** with an interactive holographic hero (React Three Fiber, selective bloom)
 - **Camera setup**: explains camera use before the browser asks, then shows a mirrored live preview with hand skeletons, detection FPS and latency, a camera picker, and a calibration checklist (hands, distance, lighting). It gives specific recovery steps when the camera is blocked, missing or busy.
+- **Hand control**: pinch to grab an object, move your hand to carry it, and open your fingers to release. Works with either hand.
+  - Cursors per hand (cyan right, violet left) show detected, hovering (with pinch progress), grabbing, released and lost states.
+  - Accurate at any window size and with the side panels open: the hand maps onto the visible scene area, and picking uses the same camera projection as rendering.
+  - One Euro smoothing (adjustable), a "reach" setting for how far you move, and a 300 ms grace that freezes held objects through brief tracking dropouts.
+  - Detection runs in a Web Worker with a main-thread fallback. The tracking panel shows backend, detection rate, inference time and end-to-end latency, and can record landmarks (never video).
 - **Workspace**: holographic lab environment with directly manipulable objects
   - Mouse: click to select, drag to move, Shift-drag to rotate, scroll to scale, drag empty space to orbit
   - Keyboard: Tab cycles objects, arrows move, Q/E/W/S rotate, +/− scale, Delete removes, ? shows controls
@@ -30,7 +35,7 @@ flowchart TD
   telemetry[Telemetry: FPS, latency] -.-> hud[HUD]
 ```
 
-Three rules keep it fast and testable (see [ADR-0002](docs/adr/0002-threading-and-render-loop.md)):
+Three rules keep it fast and testable (see [ADR-0002](docs/adr/0002-threading-and-render-loop.md), and [ADR-0003](docs/adr/0003-hand-pointer-pipeline.md) for the hand pipeline):
 
 1. **Every input becomes a `Command`.** One pure reducer handles them all, so mouse, keyboard, gestures and replays share the same tested logic.
 2. **No per-frame data in React state.** Landmarks and transforms live in refs and the render loop. React only sees throttled summaries.
@@ -42,8 +47,10 @@ Landmark conventions and normalization are defined once in [`shared/landmark-spe
 
 ```
 web/                  Vite + React + TypeScript app
-  src/core/           framework-free logic: vision, interaction (commands, reducer)
-  src/features/       landing, setup, workspace, camera
+  src/core/           framework-free logic: vision (sources, worker, replay),
+                      tracking (smoothing, pinch, hand tracks), interaction
+                      (commands, reducer, hand mapping, hand engine)
+  src/features/       landing, setup, workspace, camera, hands
   src/scene/          R3F canvas, environments, objects, shaders
   src/ui/             design system (glass components, tokens)
   src/stores/         Zustand stores: settings, scene, HUD layout
@@ -77,6 +84,7 @@ Open `http://localhost:5173`. Camera access needs `localhost` or HTTPS. Desktop 
 
 - **Unit (Vitest):** command reducer, keyboard mapping, camera error handling, calibration math, rate meters, settings, UI components, landmark normalization (property tests and golden vectors)
 - **End-to-end (Playwright, fake camera):** landing → setup, the camera on/off flow and turning it off on navigation, keyboard control without focus traps, panels, settings persistence
+- **Hand interaction (Playwright + scripted landmarks):** grab/move/release at four window sizes, panels open and hidden, both hands; tracking dropouts; swept pinches and idle hands never grab. Where the hand model is available (CI), a test also checks that live detection starts in the workspace.
 - CI runs everything on every pull request.
 
 Performance numbers are recorded in [docs/benchmarks.md](docs/benchmarks.md). Only measured values go there.

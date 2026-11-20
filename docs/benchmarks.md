@@ -27,6 +27,37 @@ Measured 2026-11-20 at commit `631ed59` on the reference machine, with DevTools 
 
 Because both render readings hit the display's 120 Hz cap, they show that rendering keeps up, not how much headroom is left. GPU frame cost needs a DevTools Performance trace, planned for the M6 performance pass.
 
+## Milestone 2: hand interaction
+
+### Pipeline (synthetic, deterministic)
+
+From `web/src/core/tracking/pipeline.measure.test.ts`: tracker + mapping at 1440×900 with panels open, 30 Hz input, independent landmark noise of ±0.002 of the frame. Render easing (12 ms time constant) comes on top.
+
+| Smoothing setting | Cursor jitter, still hand (RMS) | Lag during a 0.5 s drag | Within 2 px after stopping |
+| ----------------- | ------------------------------- | ----------------------- | -------------------------- |
+| 0                 | 0.75 px                         | 9 ms                    | 67 ms                      |
+| 0.5 (default)     | 0.59 px                         | 14 ms                   | 67 ms                      |
+| 1                 | 0.26 px                         | 38 ms                   | 200 ms                     |
+
+Real MediaPipe noise is partly correlated across landmarks (the whole hand shifts), which averaging doesn't remove, so real jitter will be higher. It's measured on hardware below.
+
+### Mapping accuracy (end-to-end, scripted landmarks)
+
+Replayed pinch-grabs of the cube to scene position (0.25, 0.30), through tracker, mapping, render-camera raycast, engine and scene, in `e2e/hand-interaction.spec.ts`: 1440×900 (panels open and hidden), 950×920, 700×900, with the right and left hand. The final position is within 0.2 px of the target in every case. Short dropouts (≤ 300 ms) freeze the object and the grab continues; longer ones release it in place.
+
+### On the reference MacBook Pro
+
+| Metric                                 | Worker | Main thread | Notes              |
+| -------------------------------------- | ------ | ----------- | ------------------ |
+| Render FPS while tracking 1 hand, idle |        |             | HUD                |
+| Render FPS while dragging with a hand  |        |             | HUD                |
+| Detection rate                         |        |             | Tracking panel     |
+| Inference time                         |        |             | Tracking panel     |
+| Capture → render latency               |        |             | Tracking panel     |
+| Cursor jitter, still hand              |        |             | Recorded landmarks |
+
+Not measured yet. The backend can be pinned under _Hand tracking → Runs in_ to fill both columns.
+
 ### Bundle (measured 2026-11-20, production build)
 
 | Chunk                                  | Size     | Gzipped | Loaded on                      |
