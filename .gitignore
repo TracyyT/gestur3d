@@ -1,0 +1,50 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+build/
+*.tsbuildinfo
+.vite/
+
+# tests
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# env
+.env
+.env.*
+!.env.example
+
+# editors / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# deploy
+.vercel/
+
+# python / ml
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+ml/runs/
+ml/checkpoints/
+
+# datasets are never committed (landmark data from participants stays local)
+datasets/
+ml/data/raw/
+ml/data/processed/
+
+# large model artifacts are fetched or exported, not committed
+*.onnx
+!web/public/models/gestures/*.onnx
