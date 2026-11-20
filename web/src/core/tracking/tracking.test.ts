@@ -161,6 +161,15 @@ describe('HandTracker', () => {
     expect(tr.expire(600)).toHaveLength(0);
   });
 
+  it('a hand gone longer than the grace period is not re-matched, even without expire()', () => {
+    const tr = new HandTracker({ lostGraceMs: 300 });
+    const [first] = tr.update(frame(0, synthHand({ cx: 0.5, cy: 0.7 })), A);
+    tr.update(frame(33), A);
+    const back = tr.update(frame(600, synthHand({ cx: 0.5, cy: 0.7 })), A);
+    expect(back).toHaveLength(1);
+    expect(back[0]!.id).not.toBe(first!.id);
+  });
+
   it('treats an implausible jump as a different hand', () => {
     const tr = new HandTracker();
     const [a] = tr.update(frame(0, synthHand({ cx: 0.2, cy: 0.7 })), A);

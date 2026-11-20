@@ -37,6 +37,7 @@ export function HandController() {
   const config = useRef('');
   const wasGrabbing = useRef(false);
   const sizeRef = useRef({ width: 1, height: 1 });
+  const lastFrame = useRef({ wall: -Infinity, ts: 0 });
 
   const tools = useMemo(
     () => ({
@@ -95,7 +96,11 @@ export function HandController() {
     // Several detections can land in one rendered frame (render hitch, slow
     // GPU). Pinch start/end edges from all of them must reach the engine.
     const edges = new Map<number, { started: boolean; ended: boolean }>();
-    for (const f of queue.current.splice(0)) {
+    const batch = queue.current.splice(0);
+    if (batch.length) {
+      lastFrame.current = { wall: now, ts: batch.at(-1)!.timestamp };
+    }
+    for (const f of batch) {
       for (const t of tracker.update(f, aspect)) {
         const e = edges.get(t.id) ?? { started: false, ended: false };
         e.started ||= t.pinch.started;
@@ -105,7 +110,11 @@ export function HandController() {
       handRuntime.frames.tick(now);
       handRuntime.latency.tick(now, now - (f.captureTime ?? f.timestamp));
     }
-    const tracks = tracker.expire(now);
+    // While frames are flowing, measure the lost-hand grace in frame time so a
+    // render stall can't expire a hand whose return is already queued. If
+    // frames stop (camera hidden, source stalled), fall back to wall time.
+    const flowing = now - lastFrame.current.wall < 500;
+    const tracks = tracker.expire(flowing ? lastFrame.current.ts : now);
 
     const rect = visibleSceneRect(useHudLayout.getState().panelsVisible, size.width, size.height);
     const box = interactionBox(settings.handReach, aspect, rect.width / rect.height);

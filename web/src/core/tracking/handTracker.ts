@@ -122,6 +122,9 @@ export class HandTracker {
   /** Feed one detection frame. `aspect` = camera width / height. */
   update(frame: HandFrame, aspect: number): TrackSnapshot[] {
     const now = frame.timestamp;
+    // Grace is measured in frame time: a hand gone longer than the grace
+    // period can't be re-matched, however late this frame is processed.
+    this.expire(now);
     const detections = frame.hands.map((hand) => ({
       hand,
       raw: anchorPoint(hand.image, this.options.anchorMode),
