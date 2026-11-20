@@ -1,8 +1,5 @@
-import {
-  FilesetResolver,
-  HandLandmarker,
-  type HandLandmarkerResult,
-} from '@mediapipe/tasks-vision';
+import { HandLandmarker, type HandLandmarkerResult } from '@mediapipe/tasks-vision';
+import { loadVisionRuntime } from './mediapipeRuntime';
 import { RateMeter } from './rateMeter';
 import type { HandFrame, HandSource, Handedness, TrackedHand } from './types';
 
@@ -18,9 +15,10 @@ export interface LoadedHandLandmarker {
 
 /** Load the Hand Landmarker, preferring the GPU delegate and falling back to CPU. */
 export async function loadHandLandmarker(numHands = 2): Promise<LoadedHandLandmarker> {
-  const fileset = await FilesetResolver.forVisionTasks(`${MEDIAPIPE_BASE}/wasm`);
-  const create = (delegate: Delegate) =>
-    HandLandmarker.createFromOptions(fileset, {
+  const runtime = await loadVisionRuntime(new URL(MEDIAPIPE_BASE, location.origin).href);
+  const create = (delegate: Delegate) => {
+    runtime.arm();
+    return HandLandmarker.createFromOptions(runtime.fileset, {
       baseOptions: { modelAssetPath: `${MEDIAPIPE_BASE}/hand_landmarker.task`, delegate },
       runningMode: 'VIDEO',
       numHands,
@@ -28,6 +26,7 @@ export async function loadHandLandmarker(numHands = 2): Promise<LoadedHandLandma
       minHandPresenceConfidence: 0.6,
       minTrackingConfidence: 0.5,
     });
+  };
   try {
     return { landmarker: await create('GPU'), delegate: 'GPU' };
   } catch {
@@ -65,7 +64,7 @@ export function toHandFrame(
 }
 
 type VideoWithRvfc = HTMLVideoElement & {
-  requestVideoFrameCallback?: (cb: () => void) => number;
+  requestVideoFrameCallback?: (cb: (now: number, meta: { captureTime?: number }) => void) => number;
   cancelVideoFrameCallback?: (handle: number) => void;
 };
 
@@ -77,6 +76,7 @@ type VideoWithRvfc = HTMLVideoElement & {
 export class MainThreadHandSource implements HandSource {
   readonly backend = 'main-thread' as const;
   readonly stats = new RateMeter(1000);
+  delegate: Delegate | null = null;
   private listeners = new Set<(f: HandFrame) => void>();
   private running = false;
   private handle: number | null = null;
@@ -119,11 +119,11 @@ export class MainThreadHandSource implements HandSource {
     // requestVideoFrameCallback fires once per decoded frame, so we never run
     // detection twice on the same image. Fall back to rAF where unsupported.
     this.handle = this.video.requestVideoFrameCallback
-      ? this.video.requestVideoFrameCallback(this.process)
-      : requestAnimationFrame(this.process);
+      ? this.video.requestVideoFrameCallback((_now, meta) => this.process(meta.captureTime))
+      : requestAnimationFrame(() => this.process(undefined));
   }
 
-  private process = () => {
+  private process = (captureTime: number | undefined) => {
     if (!this.running) return;
     const v = this.video;
     if (v.readyState >= 2 && v.currentTime !== this.lastVideoTime) {
@@ -133,6 +133,7 @@ export class MainThreadHandSource implements HandSource {
       const t1 = performance.now();
       this.stats.tick(t1, t1 - t0);
       const frame = toHandFrame(result, t0, t1 - t0);
+      frame.captureTime = captureTime;
       this.listeners.forEach((l) => l(frame));
     }
     this.schedule();

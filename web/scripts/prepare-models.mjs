@@ -28,10 +28,11 @@ const MODELS = [
 ];
 
 /**
- * FilesetResolver.forVisionTasks(base) without `useModule` loads exactly these
- * two files; the package's *_module_internal variant (another ~15 MB) is unused.
+ * The app loads MediaPipe's ES-module runtime itself (src/core/vision/
+ * mediapipeRuntime.ts), on the main thread and in the worker, so only the
+ * module variant is shipped.
  */
-const WASM_FILES = ['vision_wasm_internal.js', 'vision_wasm_internal.wasm'];
+const WASM_FILES = ['vision_wasm_module_internal.js', 'vision_wasm_module_internal.wasm'];
 
 async function copyWasm() {
   // pnpm links the package into web/node_modules; its exports map hides package.json.
