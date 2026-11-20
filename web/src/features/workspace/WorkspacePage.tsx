@@ -1,9 +1,12 @@
-import { lazy, Suspense, useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { objectLabel } from '@/core/interaction/sceneModel';
 import { supportsWebGL2 } from '@/lib/webgl';
 import { useScene } from '@/stores/scene';
 import { GlassPanel, Kbd, Logo } from '@/ui';
+import { HandCursorOverlay } from '@/features/hands/HandCursorOverlay';
+import { installTestHooks } from '@/features/hands/testHooks';
+import { useWorkspaceHandSource } from '@/features/hands/useWorkspaceHandSource';
 import { Hud } from './hud/Hud';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { useWorkspaceKeyboard } from './useWorkspaceKeyboard';
@@ -42,6 +45,8 @@ export function WorkspacePage() {
   const [webgl] = useState(supportsWebGL2);
   const toggleHelp = useCallback(() => setHelpOpen((o) => !o), []);
   const onKeyDown = useWorkspaceKeyboard(toggleHelp);
+  useWorkspaceHandSource();
+  useEffect(installTestHooks, []);
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-void">
@@ -63,6 +68,7 @@ export function WorkspacePage() {
         )}
       </div>
 
+      <HandCursorOverlay />
       <SelectionAnnouncer />
       <Hud />
 
