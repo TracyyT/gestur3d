@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router';
 import { RootLayout } from './RootLayout';
 import { NotFound } from './NotFound';
+import { RouteFallback } from './RouteFallback';
 
 /**
  * Route table. Heavy routes (3D, camera, ML) are lazy-loaded so the landing
@@ -10,6 +11,7 @@ export const routes: RouteObject[] = [
   {
     path: '/',
     element: <RootLayout />,
+    hydrateFallbackElement: <RouteFallback />,
     children: [
       {
         index: true,
@@ -27,6 +29,16 @@ export const routes: RouteObject[] = [
           Component: (await import('@/features/workspace/WorkspacePage')).WorkspacePage,
         }),
       },
+      ...(import.meta.env.DEV
+        ? [
+            {
+              path: 'dev/ui',
+              lazy: async () => ({
+                Component: (await import('@/features/dev/UiGallery')).UiGallery,
+              }),
+            },
+          ]
+        : []),
       { path: '*', element: <NotFound /> },
     ],
   },

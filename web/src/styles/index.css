@@ -48,3 +48,61 @@ body {
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
 }
+
+/* Range input: thin track with a cyan fill up to the thumb. */
+.g3d-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+.g3d-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--color-holo-cyan) 0 var(--fill, 50%),
+    rgb(255 255 255 / 0.1) var(--fill, 50%) 100%
+  );
+}
+.g3d-range::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.1);
+}
+.g3d-range::-moz-range-progress {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-holo-cyan);
+}
+.g3d-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  margin-top: -6px;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  background: var(--color-ink-1);
+  border: 3px solid var(--color-void);
+  box-shadow:
+    0 0 0 1px var(--color-holo-cyan),
+    0 0 12px var(--color-holo-cyan);
+}
+.g3d-range::-moz-range-thumb {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--color-ink-1);
+  border: 3px solid var(--color-void);
+  box-shadow:
+    0 0 0 1px var(--color-holo-cyan),
+    0 0 12px var(--color-holo-cyan);
+}
+.g3d-range:focus-visible {
+  outline: none;
+}
+.g3d-range:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 2px var(--color-holo-cyan),
+    0 0 16px var(--color-holo-cyan);
+}
