@@ -26,6 +26,10 @@ export interface GrabScript {
   jitter?: number;
   /** Playback speed (< 1 = slower, for capturing screenshots). */
   speed?: number;
+  /** How firmly the pinch closes (1 = fingertips touching; ~0.72 ≈ a light real pinch). */
+  grip?: number;
+  /** Grip in the middle of the move, to simulate a hand loosening while carrying. */
+  loosenTo?: number;
 }
 
 const ASPECT = 16 / 9;
@@ -76,28 +80,38 @@ function grabRecording({
   handedness = 'Right',
   dropoutMs = 0,
   jitter = 0,
+  grip = 1,
+  loosenTo,
 }: GrabScript): Recording {
   const k = (at: number, uv: UV, pinch: number, visible = true): Keyframe => {
     const [cx, cy] = wristAt(uv, pinch, handedness);
     return { at, cx, cy, pinch, visible };
   };
   const mid = { u: (from.u + to.u) / 2, v: (from.v + to.v) / 2 };
-  const keys: Keyframe[] = [k(0, from, 0), k(400, from, 0), k(550, from, 1), k(800, from, 1)];
+  const keys: Keyframe[] = [k(0, from, 0), k(400, from, 0), k(550, from, grip), k(800, from, grip)];
   if (dropoutMs > 0) {
     keys.push(
-      k(1100, mid, 1),
-      k(1101, mid, 1, false),
-      k(1100 + dropoutMs, mid, 1, false),
-      k(1101 + dropoutMs, mid, 1),
+      k(1100, mid, grip),
+      k(1101, mid, grip, false),
+      k(1100 + dropoutMs, mid, grip, false),
+      k(1101 + dropoutMs, mid, grip),
     );
     keys.push(
-      k(1500 + dropoutMs, to, 1),
-      k(1800 + dropoutMs, to, 1),
+      k(1500 + dropoutMs, to, grip),
+      k(1800 + dropoutMs, to, grip),
       k(1950 + dropoutMs, to, 0),
       k(2300 + dropoutMs, to, 0),
     );
+  } else if (loosenTo !== undefined) {
+    keys.push(
+      k(1200, mid, loosenTo),
+      k(1600, to, grip),
+      k(1900, to, grip),
+      k(2050, to, 0),
+      k(2400, to, 0),
+    );
   } else {
-    keys.push(k(1600, to, 1), k(1900, to, 1), k(2050, to, 0), k(2400, to, 0));
+    keys.push(k(1600, to, grip), k(1900, to, grip), k(2050, to, 0), k(2400, to, 0));
   }
   return scriptedRecording(keys, { handedness, aspect: ASPECT, jitter });
 }

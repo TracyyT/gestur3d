@@ -81,7 +81,13 @@ interface Track {
   lostSince: number | null;
 }
 
-const NO_PINCH: PinchState = { strength: 0, active: false, started: false, ended: false };
+const NO_PINCH: PinchState = {
+  strength: 0,
+  ratio: Infinity,
+  active: false,
+  started: false,
+  ended: false,
+};
 
 /**
  * Max distance (camera-normalized, aspect-corrected) a hand can plausibly move

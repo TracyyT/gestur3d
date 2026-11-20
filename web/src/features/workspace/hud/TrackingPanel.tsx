@@ -5,6 +5,7 @@ import { LandmarkRecorder } from '@/core/vision/replaySource';
 import { handRuntime } from '@/features/hands/handRuntime';
 import { useHandTracking } from '@/features/hands/handTrackingStore';
 import { useSampled } from '@/hooks/useSampled';
+import { sensitivityToThresholds } from '@/core/tracking/pinch';
 import { useSettings, type TrackingBackendPreference } from '@/stores/settings';
 import { Button, Panel, Select, buttonClasses } from '@/ui';
 
@@ -30,6 +31,8 @@ function Metric({ label, value, unit }: { label: string; value: string; unit?: s
 export function TrackingPanel() {
   const { status, backend, delegate, error, source, cameraAspect } = useHandTracking();
   const preference = useSettings((s) => s.trackingBackend);
+  const sensitivity = useSettings((s) => s.gestureSensitivity);
+  const { enter, exit } = sensitivityToThresholds(sensitivity);
   const set = useSettings((s) => s.set);
   const recorder = useRef(new LandmarkRecorder());
   const [recording, setRecording] = useState(false);
@@ -44,6 +47,9 @@ export function TrackingPanel() {
       latencyMs: handRuntime.latency.meanDuration(),
       hands: handRuntime.pointers.filter((p) => p.phase !== 'lost').length,
       frames: recorder.current.frameCount,
+      ratios: handRuntime.pointers
+        .filter((p) => p.phase !== 'lost' && Number.isFinite(p.pinchRatio))
+        .map((p) => ({ side: p.handedness, ratio: p.pinchRatio })),
     };
   }, [source]);
   const m = useSampled(read, 250);
@@ -96,6 +102,34 @@ export function TrackingPanel() {
             <Metric label="Inference" value={m.inferMs ? m.inferMs.toFixed(1) : '—'} unit="ms" />
             <Metric label="Latency" value={m.latencyMs ? m.latencyMs.toFixed(0) : '—'} unit="ms" />
             <Metric label="Hands" value={String(m.hands)} />
+          </div>
+        )}
+
+        {running && (
+          <div className="glass-inset rounded-lg px-2.5 py-2 text-[12px]">
+            <p className="text-[10.5px] tracking-[0.12em] text-ink-3 uppercase">
+              Pinch calibration
+            </p>
+            {m.ratios.length ? (
+              m.ratios.map((r) => (
+                <p key={r.side} className="tabular mt-1 flex justify-between font-mono text-ink-1">
+                  <span>{r.side}</span>
+                  <span>
+                    {r.ratio.toFixed(2)}
+                    <span className={r.ratio < enter ? 'text-signal-good' : 'text-ink-3'}>
+                      {' '}
+                      {r.ratio < enter ? '≤' : '>'} {enter.toFixed(2)}
+                    </span>
+                  </span>
+                </p>
+              ))
+            ) : (
+              <p className="mt-1 text-ink-3">Show a hand to see its pinch ratio.</p>
+            )}
+            <p className="mt-1.5 text-[11px] text-ink-3">
+              A grab starts below {enter.toFixed(2)} and lets go above {exit.toFixed(2)}. Gesture
+              sensitivity moves both.
+            </p>
           </div>
         )}
 

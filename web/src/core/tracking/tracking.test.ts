@@ -87,22 +87,49 @@ describe('pinch', () => {
   it('detector needs a short hold, and uses hysteresis', () => {
     const th = sensitivityToThresholds(0.5);
     const d = new PinchDetector(th);
-    expect(d.update(th.enter - 0.05, 0).active).toBe(false);
-    const s = d.update(th.enter - 0.05, th.minHoldMs);
+    const closed = th.enter - 0.1;
+    expect(d.update(closed, 0).active).toBe(false);
+    const s = d.update(closed, th.minHoldMs);
     expect(s.active && s.started).toBe(true);
-    // Between enter and exit: stays pinched (no flicker).
-    expect(d.update((th.enter + th.exit) / 2, 100).active).toBe(true);
-    const e = d.update(th.exit + 0.05, 120);
-    expect(e.active).toBe(false);
-    expect(e.ended).toBe(true);
+    // A loosened grip between enter and exit stays pinched (no flicker).
+    for (let t = 100; t < 400; t += 33)
+      expect(d.update((th.enter + th.exit) / 2, t).active).toBe(true);
   });
 
-  it('flags "releasing" between the enter and exit thresholds while pinched', () => {
+  it('a single open spike while holding does not drop the pinch', () => {
     const th = sensitivityToThresholds(0.5);
     const d = new PinchDetector(th);
-    d.update(0.1, 0);
-    expect(d.update(0.1, th.minHoldMs).releasing).toBe(false);
-    expect(d.update((th.enter + th.exit) / 2, 100).releasing).toBe(true);
+    d.update(0.2, 0);
+    d.update(0.2, 60);
+    expect(d.update(1.5, 93).active).toBe(true); // one noisy frame
+    expect(d.update(0.2, 126).active).toBe(true);
+    expect(d.update(0.2, 159).active).toBe(true);
+  });
+
+  it('releases once the fingers stay open past exit, flagging "releasing" meanwhile', () => {
+    const th = sensitivityToThresholds(0.5);
+    const d = new PinchDetector(th);
+    d.update(0.2, 0);
+    d.update(0.2, 60);
+    let t = 60;
+    let sawReleasing = false;
+    let ended = false;
+    for (let i = 0; i < 10 && !ended; i++) {
+      const st = d.update(1.2, (t += 33));
+      sawReleasing ||= !!st.releasing && st.active;
+      ended = st.ended;
+    }
+    expect(sawReleasing).toBe(true);
+    expect(ended).toBe(true);
+    expect(t - 60).toBeLessThanOrEqual(200);
+  });
+
+  it('real-hand pinch ratios (~0.35–0.42) start a grab at default sensitivity', () => {
+    const th = sensitivityToThresholds(0.5);
+    const d = new PinchDetector(th);
+    d.update(0.4, 0);
+    expect(d.update(0.38, 60).active).toBe(true);
+    expect(d.update(0.38, 93).strength).toBe(1);
   });
 
   it('a single closed frame does not trigger', () => {
@@ -203,8 +230,12 @@ describe('HandTracker', () => {
       started ||= s!.pinch.started;
     }
     expect(started).toBe(true);
-    const [after] = tr.update(frame(t + 33, synthHand({ cx: 0.5, cy: 0.7 })), A);
-    expect(after!.pinch.ended).toBe(true);
+    let ended = false;
+    for (let i = 0; i < 8 && !ended; i++) {
+      const [after] = tr.update(frame((t += 33), synthHand({ cx: 0.5, cy: 0.7 })), A);
+      ended = after!.pinch.ended;
+    }
+    expect(ended).toBe(true);
   });
 
   it('plausible-move budget grows with time between frames', () => {

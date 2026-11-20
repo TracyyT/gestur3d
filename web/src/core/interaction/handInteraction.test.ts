@@ -22,6 +22,7 @@ function scene(objects: Record<string, Vec3>): SceneQuery {
 
 const pinch = (p: Partial<PinchState> = {}): PinchState => ({
   strength: 0,
+  ratio: 1,
   active: false,
   started: false,
   ended: false,
