@@ -7,6 +7,7 @@ import { useScene } from '@/stores/scene';
 import { useSettings } from '@/stores/settings';
 import { HoloLab } from './environments/HoloLab';
 import { FrameProbe } from './FrameProbe';
+import { PanelAwareFraming } from './PanelAwareFraming';
 import { HoloObject } from './objects/HoloObject';
 
 function SceneObjects({
@@ -63,6 +64,7 @@ export default function WorkspaceCanvas() {
       }}
     >
       <FrameProbe />
+      <PanelAwareFraming instant={reducedMotion} />
       <HoloLab particleDensity={particleDensity} />
       <SceneObjects instant={reducedMotion} onHoverChange={onHoverChange} />
       <OrbitControls
