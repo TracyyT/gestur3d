@@ -31,25 +31,37 @@ export interface PinchThresholds {
   enter: number;
   /** Ratio above which a pinch ends (> enter: hysteresis). */
   exit: number;
-  /** Ratio treated as "fully open" for the 0..1 strength readout. */
+  /** Ratio treated as "fully open" for the strength readout. */
   open: number;
-  /** Pinch must stay closed this long before it counts. */
+  /** Fingers must stay closed this long before a pinch starts. */
   minHoldMs: number;
+  /** Fingers must stay open past `exit` this long before a pinch ends. */
+  releaseHoldMs: number;
 }
 
 /**
- * Thresholds from the 0..1 "Gesture sensitivity" setting. Higher sensitivity
- * starts a pinch with the fingers further apart.
+ * Thresholds from the 0..1 "Gesture sensitivity" setting.
+ *
+ * Calibrated against a real hand on the reference MacBook: with fingertips
+ * touching, MediaPipe's tip landmarks sit ~1.5–3 cm apart, so the ratio to
+ * palm size lands around 0.3–0.45, higher than synthetic hands. The wide
+ * enter/exit gap means a grip that loosens slightly while moving doesn't drop
+ * the object.
  */
 export function sensitivityToThresholds(sensitivity: number): PinchThresholds {
   const s = Math.min(1, Math.max(0, sensitivity));
-  const enter = 0.22 + 0.16 * s; // 0.22 .. 0.38 (0.30 at default)
-  return { enter, exit: enter + 0.15, open: 1.0, minHoldMs: 60 };
+  const enter = 0.37 + 0.16 * s; // 0.37 .. 0.53 (0.45 at default)
+  return { enter, exit: enter + 0.2, open: 1.1, minHoldMs: 50, releaseHoldMs: 70 };
 }
 
 export interface PinchState {
-  /** 0 = fully open, 1 = fingers touching. For UI feedback. */
+  /**
+   * 0 = fully open, 1 = closed enough to grab (ratio at or below `enter`).
+   * The HUD bar is full exactly when a grab can start.
+   */
   strength: number;
+  /** Smoothed thumb-index / palm ratio (for calibration readouts). */
+  ratio: number;
   /** Debounced pinch state used for grabbing. */
   active: boolean;
   /** True on the update where `active` became true. */
@@ -57,30 +69,40 @@ export interface PinchState {
   /** True on the update where `active` became false. */
   ended: boolean;
   /**
-   * Still pinched, but the fingers have opened past the start threshold
-   * (between enter and exit). The user is letting go: held objects should
-   * stop following, so release can't nudge them.
+   * Fingers have opened past `exit` and the release is being confirmed
+   * (at most `releaseHoldMs`). Held objects pause so letting go can't drag them.
    */
   releasing?: boolean;
-  /** Fingers are closed right now (ratio below the start threshold), before debouncing. */
+  /** Fingers are closed right now (smoothed ratio below `enter`), before debouncing. */
   closed?: boolean;
 }
+
+/** Light smoothing of the ratio so single noisy frames don't flip the state. */
+const RATIO_SMOOTHING = 0.5;
 
 /** Turns a noisy pinch ratio into a debounced, hysteretic on/off signal. */
 export class PinchDetector {
   thresholds: PinchThresholds;
   private active = false;
   private closedSince: number | null = null;
+  private openSince: number | null = null;
+  private smoothed: number | null = null;
 
   constructor(thresholds: PinchThresholds) {
     this.thresholds = thresholds;
   }
 
-  update(ratio: number, tMs: number): PinchState {
-    const { enter, exit, open, minHoldMs } = this.thresholds;
-    const strength = Number.isFinite(ratio)
-      ? Math.min(1, Math.max(0, (open - ratio) / (open - enter * 0.5)))
-      : 0;
+  update(rawRatio: number, tMs: number): PinchState {
+    const { enter, exit, open, minHoldMs, releaseHoldMs } = this.thresholds;
+    const finite = Number.isFinite(rawRatio);
+    if (finite) {
+      this.smoothed =
+        this.smoothed === null
+          ? rawRatio
+          : this.smoothed + (rawRatio - this.smoothed) * RATIO_SMOOTHING;
+    }
+    const ratio = finite ? this.smoothed! : Infinity;
+    const strength = finite ? Math.min(1, Math.max(0, (open - ratio) / (open - enter))) : 0;
     let started = false;
     let ended = false;
 
@@ -89,22 +111,39 @@ export class PinchDetector {
         this.closedSince ??= tMs;
         if (tMs - this.closedSince >= minHoldMs) {
           this.active = true;
+          this.openSince = null;
           started = true;
         }
       } else {
         this.closedSince = null;
       }
     } else if (ratio > exit) {
-      this.active = false;
-      this.closedSince = null;
-      ended = true;
+      this.openSince ??= tMs;
+      if (tMs - this.openSince >= releaseHoldMs) {
+        this.active = false;
+        this.closedSince = null;
+        this.openSince = null;
+        ended = true;
+      }
+    } else {
+      this.openSince = null;
     }
-    const releasing = this.active && ratio > enter;
-    return { strength, active: this.active, started, ended, releasing, closed: ratio < enter };
+    const releasing = this.active && this.openSince !== null;
+    return {
+      strength,
+      ratio,
+      active: this.active,
+      started,
+      ended,
+      releasing,
+      closed: ratio < enter,
+    };
   }
 
   reset() {
     this.active = false;
     this.closedSince = null;
+    this.openSince = null;
+    this.smoothed = null;
   }
 }
