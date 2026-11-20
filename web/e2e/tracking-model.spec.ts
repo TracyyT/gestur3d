@@ -33,11 +33,12 @@ test('workspace starts hand tracking (worker or main thread) and reports it', as
     type: 'tracking backend',
     description: (await status.textContent()) ?? '',
   });
-  // Detection frames are flowing.
+  // The detector has processed frames (inference time measured). On CPU-only
+  // CI runners early frames can take over a second, so allow time.
   await expect(
     page
-      .getByText('Detection')
+      .getByText('Inference')
       .locator('..')
-      .getByText(/^\d+fps$/),
-  ).toBeVisible({ timeout: 15_000 });
+      .getByText(/^[\d.]+ms$/),
+  ).toBeVisible({ timeout: 45_000 });
 });

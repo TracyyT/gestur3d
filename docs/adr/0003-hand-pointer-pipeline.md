@@ -20,12 +20,13 @@ HandSource (worker | main thread | replay)
 
 1. **One coordinate convention.** Detection sees the raw, unmirrored frame. x is mirrored exactly once, in `cameraToScreen`. The preview mirrors only its display.
 2. **Map to the visible scene, not the window.** The reach box (default 70% of the frame, cropped to the scene rect's aspect so motion is isotropic) maps onto `visibleSceneRect()`, which is the same function the 3D camera framing uses. Screen → ray goes through the render camera's projection, including the panel offset and zoom.
-3. **Smoothing in the tracker, easing at render.** A One Euro filter on the cursor anchor (camera space, real timestamps), plus a 12 ms render-rate ease between 30 Hz detections.
-4. **Pinch is geometric.** Thumb-index distance over palm size, from metric world landmarks, with hysteresis and a 60 ms hold. It's more reliable than classification for a continuous control; trained classifiers (M5) add discrete gestures alongside it.
-5. **Grab only on the pinch's start edge**, over the hovered object. A closed pinch swept across objects, or a hand appearing already pinched, never grabs.
-6. **Tracking loss.** A missing hand is `lost` for 300 ms. The held object freezes and the grab resumes if the hand returns; otherwise it's released in place. The grace is measured in frame time while frames flow, so render stalls can't end a grab early or extend one.
-7. **Pinch edges are accumulated** across all detections consumed in a render frame, so a frame hitch can't swallow a grab.
-8. **Backends are interchangeable.** The worker (module worker, transferred `ImageBitmap`, at most one frame in flight) and the main thread share one interface. The default is chosen by measurement on the reference machine.
+3. **Cursor anchor = thumb and index knuckles.** They don't move when the pinch opens or closes (0 px drift, vs 19–38 px for fingertip-based anchors), so grabbing and releasing can't nudge the object. Held objects also stop following once the fingers start opening, before the pinch counts as ended.
+4. **Smoothing in the tracker, easing at render.** A One Euro filter on the cursor anchor (camera space, real timestamps), plus a 12 ms render-rate ease between 30 Hz detections.
+5. **Pinch is geometric.** Thumb-index distance over palm size, from metric world landmarks, with hysteresis and a 60 ms hold. It's more reliable than classification for a continuous control; trained classifiers (M5) add discrete gestures alongside it.
+6. **Grab only on the pinch's start edge**, over the hovered object. A closed pinch swept across objects, or a hand appearing already pinched, never grabs.
+7. **Tracking loss.** A missing hand is `lost` for 300 ms. The held object freezes and the grab resumes if the hand returns; otherwise it's released in place. The grace is measured in frame time while frames flow, so render stalls can't end a grab early or extend one.
+8. **Pinch edges are accumulated** across all detections consumed in a render frame, so a frame hitch can't swallow a grab.
+9. **Backends are interchangeable.** The worker (module worker, transferred `ImageBitmap`, at most one frame in flight) and the main thread share one interface. The default is chosen by measurement on the reference machine.
 
 ## Consequences
 

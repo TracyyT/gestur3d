@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cameraToScreen, interactionBox } from '@/core/interaction/handMapping';
 import type { HandFrame } from '@/core/vision/types';
-import { HandTracker } from './handTracker';
+import { anchorPoint, HandTracker } from './handTracker';
 import { synthHand } from './synthetic';
 
 /**
@@ -90,5 +90,25 @@ describe('pipeline measurements (1440×900, panels open, 30 Hz)', () => {
       if (s === 0.5) expect(lagMs).toBeLessThanOrEqual(34);
     }
     console.log('[measure] sweep 0.3 frame / 500 ms:', report.join(' | '));
+  });
+
+  it('pinch drift: cursor movement caused only by opening/closing the pinch', () => {
+    const report: string[] = [];
+    for (const mode of ['pinch', 'blend', 'knuckle'] as const) {
+      const closed = cameraToScreen(
+        anchorPoint(synthHand({ cx: 0.5, cy: 0.65, pinch: 1 }).image, mode),
+        BOX,
+        RECT,
+      );
+      const open = cameraToScreen(
+        anchorPoint(synthHand({ cx: 0.5, cy: 0.65, pinch: 0 }).image, mode),
+        BOX,
+        RECT,
+      );
+      const drift = Math.hypot(open.x - closed.x, open.y - closed.y);
+      report.push(`${mode}: ${drift.toFixed(1)} px`);
+      if (mode === 'knuckle') expect(drift).toBeLessThan(0.5);
+    }
+    console.log('[measure] full pinch open↔close drift:', report.join(' | '));
   });
 });
