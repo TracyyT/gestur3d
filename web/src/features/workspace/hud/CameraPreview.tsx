@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Link } from 'react-router';
 import { useCameraSession } from '@/features/camera/cameraSession';
+import { PreviewDebugOverlay } from '@/features/hands/PreviewDebugOverlay';
+import { useSettings } from '@/stores/settings';
 import { clampToViewport, useHudLayout } from '@/stores/hudLayout';
 import { GlassPanel, IconButton, buttonClasses } from '@/ui';
 
@@ -24,6 +26,7 @@ export function CameraPreview() {
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
 
   const on = status === 'on' && !!stream;
+  const debug = useSettings((st) => st.showDebugOverlay);
 
   useEffect(() => {
     const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
@@ -130,13 +133,16 @@ export function CameraPreview() {
         {!previewCollapsed &&
           (on ? (
             <div className="relative aspect-video border-t border-line">
-              <video
-                ref={videoRef}
-                muted
-                playsInline
-                aria-label="Your camera, mirrored"
-                className="size-full -scale-x-100 object-cover"
-              />
+              <div className="absolute inset-0 -scale-x-100">
+                <video
+                  ref={videoRef}
+                  muted
+                  playsInline
+                  aria-label="Your camera, mirrored"
+                  className="size-full object-cover"
+                />
+                {debug && <PreviewDebugOverlay />}
+              </div>
             </div>
           ) : (
             <div className="border-t border-line p-3 text-[12px] leading-relaxed text-ink-3">

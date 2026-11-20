@@ -14,8 +14,6 @@ const MOTION: Array<{ value: ReducedMotionPreference; label: string }> = [
   { value: 'off', label: 'Full motion' },
 ];
 
-const GESTURE_HINT = 'Takes effect when hand control arrives (Milestone 2).';
-
 export function SettingsPanel() {
   const s = useSettings();
 
@@ -28,13 +26,21 @@ export function SettingsPanel() {
             label="Gesture sensitivity"
             value={s.gestureSensitivity}
             onChange={(v) => s.set('gestureSensitivity', v)}
-            hint={GESTURE_HINT}
+            hint="Higher grabs with your fingers further apart."
           />
           <Slider
             label="Tracking smoothing"
             value={s.trackingSmoothing}
             onChange={(v) => s.set('trackingSmoothing', v)}
             hint="Higher is steadier but adds a little lag."
+          />
+          <Slider
+            label="Reach"
+            value={s.handReach}
+            min={0.4}
+            max={1}
+            onChange={(v) => s.set('handReach', v)}
+            hint="How much of the camera view your hand moves across to cover the scene. Lower = less arm movement."
           />
         </section>
 
@@ -69,7 +75,7 @@ export function SettingsPanel() {
           />
           <Toggle
             label="Debug overlay"
-            hint="Landmarks and gesture probabilities (Milestone 2)."
+            hint="Landmarks and the reach area on the camera preview."
             checked={s.showDebugOverlay}
             onChange={(v) => s.set('showDebugOverlay', v)}
           />
