@@ -10,6 +10,7 @@ import {
   StatusPill,
   Toggle,
 } from '@/ui';
+import { ThumbsUpHint, ThumbsUpPreviewBadge } from '@/features/setup/ThumbsUpHint';
 
 /** Dev-only gallery of design-system components (route: /dev/ui). */
 export function UiGallery() {
@@ -69,6 +70,15 @@ export function UiGallery() {
           />
         </div>
       </Panel>
+
+      <GlassPanel className="space-y-4 p-5">
+        <p className="text-[12px] tracking-[0.18em] text-ink-3 uppercase">Thumbs-up hold</p>
+        <ThumbsUpHint progress={0} />
+        <ThumbsUpHint progress={0.6} />
+      </GlassPanel>
+      <GlassPanel className="relative h-40 overflow-hidden">
+        <ThumbsUpPreviewBadge progress={0.6} />
+      </GlassPanel>
     </main>
   );
 }
