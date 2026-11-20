@@ -59,3 +59,22 @@ export function buildChecks(
 
   return [handsCheck, distanceCheck, lightCheck];
 }
+
+/** Fourth step: grayed until the first three pass, then fills while a thumbs-up is held. */
+export function thumbsUpCheck(unlocked: boolean, progress: number): CheckItem {
+  if (!unlocked) {
+    return {
+      id: 'thumbs-up',
+      label: 'Thumbs-up to enter',
+      detail: 'After the checks above.',
+      state: 'locked',
+    };
+  }
+  return {
+    id: 'thumbs-up',
+    label: 'Thumbs-up to enter',
+    detail: progress > 0 ? 'Keep holding…' : 'Hold for a second.',
+    state: 'active',
+    progress,
+  };
+}
