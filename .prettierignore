@@ -5,3 +5,4 @@ playwright-report
 test-results
 web/public/models
 ml
+shared/*/golden

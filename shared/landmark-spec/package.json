@@ -1,0 +1,21 @@
+{
+  "name": "@gestur3d/landmark-spec",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Hand landmark conventions and normalization shared by the browser and the training code",
+  "exports": {
+    ".": "./src/index.ts",
+    "./golden/v0.json": "./golden/v0.json"
+  },
+  "scripts": {
+    "golden": "node scripts/generate-golden.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.1.1"
+  }
+}
