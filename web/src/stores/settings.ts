@@ -6,10 +6,12 @@ export type ReducedMotionPreference = 'system' | 'on' | 'off';
 export type TrackingBackendPreference = 'auto' | 'worker' | 'main-thread';
 
 export interface SettingsState {
-  /** 0..1. Higher = gestures trigger with less movement / lower confidence. Active from M2. */
+  /** 0..1. Higher = pinches register with fingers further apart. */
   gestureSensitivity: number;
-  /** 0..1. Higher = steadier but slightly laggier tracking. Active from M2. */
+  /** 0..1. Higher = steadier but slightly laggier tracking. */
   trackingSmoothing: number;
+  /** 0.4..1. Fraction of the camera frame your hand moves within to cover the scene. */
+  handReach: number;
   visualQuality: VisualQuality;
   /** 0..1 multiplier on particle counts. */
   particleDensity: number;
@@ -30,6 +32,7 @@ interface SettingsActions {
 export const DEFAULT_SETTINGS: SettingsState = {
   gestureSensitivity: 0.5,
   trackingSmoothing: 0.5,
+  handReach: 0.7,
   visualQuality: 'auto',
   particleDensity: 0.6,
   reducedMotion: 'system',

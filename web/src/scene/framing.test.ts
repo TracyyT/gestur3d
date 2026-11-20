@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PANEL_COVER_PX, computeFraming } from './PanelAwareFraming';
+import { PANEL_COVER_PX, computeFraming, visibleSceneRect } from './framing';
 
 describe('computeFraming', () => {
   it('shifts by half the covered width when panels are open on wide screens', () => {
@@ -25,5 +25,13 @@ describe('computeFraming', () => {
 
   it('never zooms out past the minimum', () => {
     expect(computeFraming(false, 300, 1000).zoom).toBe(0.55);
+  });
+});
+
+describe('visibleSceneRect', () => {
+  it('excludes the panel strip only when panels reserve space', () => {
+    expect(visibleSceneRect(true, 1440, 900).width).toBe(1440 - PANEL_COVER_PX);
+    expect(visibleSceneRect(false, 1440, 900).width).toBe(1440);
+    expect(visibleSceneRect(true, 800, 900).width).toBe(800);
   });
 });
