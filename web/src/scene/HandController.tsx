@@ -8,7 +8,7 @@ import {
   type SceneQuery,
 } from '@/core/interaction/handInteraction';
 import { cameraToScreen, interactionBox, screenToNdc } from '@/core/interaction/handMapping';
-import { HandTracker } from '@/core/tracking/handTracker';
+import { HandTracker, type TrackSnapshot } from '@/core/tracking/handTracker';
 import type { HandFrame } from '@/core/vision/types';
 import { handRuntime } from '@/features/hands/handRuntime';
 import { useHandTracking } from '@/features/hands/handTrackingStore';
@@ -93,55 +93,8 @@ export function HandController() {
     }
 
     const aspect = useHandTracking.getState().cameraAspect;
-    // Several detections can land in one rendered frame (render hitch, slow
-    // GPU). Pinch start/end edges from all of them must reach the engine.
-    const edges = new Map<number, { started: boolean; ended: boolean }>();
-    const batch = queue.current.splice(0);
-    if (batch.length) {
-      lastFrame.current = { wall: now, ts: batch.at(-1)!.timestamp };
-    }
-    for (const f of batch) {
-      for (const t of tracker.update(f, aspect)) {
-        const e = edges.get(t.id) ?? { started: false, ended: false };
-        e.started ||= t.pinch.started;
-        e.ended ||= t.pinch.ended;
-        edges.set(t.id, e);
-      }
-      handRuntime.frames.tick(now);
-      handRuntime.latency.tick(now, now - (f.captureTime ?? f.timestamp));
-    }
-    // While frames are flowing, measure the lost-hand grace in frame time so a
-    // render stall can't expire a hand whose return is already queued. If
-    // frames stop (camera hidden, source stalled), fall back to wall time.
-    const flowing = now - lastFrame.current.wall < 500;
-    const tracks = tracker.expire(flowing ? lastFrame.current.ts : now);
-
     const rect = visibleSceneRect(useHudLayout.getState().panelsVisible, size.width, size.height);
     const box = interactionBox(settings.handReach, aspect, rect.width / rect.height);
-    const k = 1 - Math.exp((-delta * 1000) / CURSOR_TAU_MS);
-
-    const inputs: PointerInput[] = tracks.map((t) => {
-      const target = cameraToScreen(t.anchor, box, rect);
-      const prev = display.current.get(t.id);
-      const shown = prev
-        ? { x: prev.x + (target.x - prev.x) * k, y: prev.y + (target.y - prev.y) * k }
-        : target;
-      display.current.set(t.id, shown);
-      // Edges only count on the render frame that consumed their detections.
-      const e = edges.get(t.id);
-      const pinch = { ...t.pinch, started: e?.started ?? false, ended: e?.ended ?? false };
-      return {
-        id: t.id,
-        handedness: t.handedness,
-        status: t.status,
-        screen: shown,
-        inBox: target.inBox,
-        pinch,
-      };
-    });
-    for (const id of display.current.keys()) {
-      if (!tracks.some((t) => t.id === id)) display.current.delete(id);
-    }
 
     const { raycaster, ndc, plane, v, n } = tools;
     const aim = (x: number, y: number) => {
@@ -164,13 +117,64 @@ export function HandController() {
       objectPosition: (id) =>
         useScene.getState().objects.find((o) => o.id === id)?.position ?? null,
     };
-
-    const result = engine.update(now, inputs, query, (id) => handRuntime.mouseDragId === id);
     const scene = useScene.getState();
-    for (const cmd of result.commands) scene.dispatch(cmd, 'gesture');
+    const blocked = (id: string) => handRuntime.mouseDragId === id;
+    const toInputs = (tracks: TrackSnapshot[], edges: boolean): PointerInput[] =>
+      tracks.map((t) => {
+        const mapped = cameraToScreen(t.anchor, box, rect);
+        return {
+          id: t.id,
+          handedness: t.handedness,
+          status: t.status,
+          screen: { x: mapped.x, y: mapped.y },
+          inBox: mapped.inBox,
+          pinch: edges ? t.pinch : { ...t.pinch, started: false, ended: false },
+        };
+      });
+    const run = (t: number, inputs: PointerInput[]) => {
+      const r = engine.update(t, inputs, query, blocked);
+      for (const cmd of r.commands) scene.dispatch(cmd, 'gesture');
+      return r;
+    };
+
+    // Interaction logic runs once per DETECTION, in order, so it never depends
+    // on the render rate: a render stall can't drop a grab, skip the last
+    // moves before a release, or merge pinch edges.
+    let result: ReturnType<HandInteractionEngine['update']> | null = null;
+    const batch = queue.current.splice(0);
+    for (const f of batch) {
+      result = run(f.timestamp, toInputs(tracker.update(f, aspect), true));
+      handRuntime.frames.tick(now);
+      handRuntime.latency.tick(now, now - (f.captureTime ?? f.timestamp));
+    }
+    if (batch.length) lastFrame.current = { wall: now, ts: batch.at(-1)!.timestamp };
+
+    // While frames are flowing, measure the lost-hand grace in frame time so a
+    // render stall can't expire a hand whose return is already queued. If
+    // frames stop (camera hidden, source stalled), fall back to wall time.
+    const flowing = now - lastFrame.current.wall < 500;
+    const expireAt = flowing ? lastFrame.current.ts : now;
+    const before = tracker.snapshot().length;
+    const tracks = tracker.expire(expireAt);
+    if (!result || tracks.length !== before) result = run(expireAt, toInputs(tracks, false));
+
     if (result.grabbing !== wasGrabbing.current) {
       scene.setMode(result.grabbing ? 'moving' : 'selecting', 'gesture');
       wasGrabbing.current = result.grabbing;
+    }
+
+    // Cursors are drawn eased at render rate between 30 Hz detections.
+    const k = 1 - Math.exp((-delta * 1000) / CURSOR_TAU_MS);
+    for (const p of result.pointers) {
+      const prev = display.current.get(p.id);
+      const shown = prev
+        ? { x: prev.x + (p.screen.x - prev.x) * k, y: prev.y + (p.screen.y - prev.y) * k }
+        : p.screen;
+      display.current.set(p.id, shown);
+      p.screen = shown;
+    }
+    for (const id of display.current.keys()) {
+      if (!result.pointers.some((p) => p.id === id)) display.current.delete(id);
     }
 
     handRuntime.pointers = result.pointers;
