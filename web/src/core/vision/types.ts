@@ -28,6 +28,11 @@ export interface HandFrame {
   timestamp: number;
   /** Time spent inside the detector for this frame, ms. */
   detectionMs: number;
+  /**
+   * When the camera captured the frame (performance.now() timebase), if the
+   * browser reports it. Used for end-to-end latency.
+   */
+  captureTime?: number;
   hands: TrackedHand[];
 }
 

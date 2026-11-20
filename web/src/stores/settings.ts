@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type VisualQuality = 'auto' | 'low' | 'medium' | 'high';
 export type ReducedMotionPreference = 'system' | 'on' | 'off';
+export type TrackingBackendPreference = 'auto' | 'worker' | 'main-thread';
 
 export interface SettingsState {
   /** 0..1. Higher = pinches register with fingers further apart. */
@@ -19,6 +20,8 @@ export interface SettingsState {
   mouseKeyboardEnabled: boolean;
   showDebugOverlay: boolean;
   preferredCameraId: string | null;
+  /** Where hand detection runs. Auto = worker, falling back to the main thread. */
+  trackingBackend: TrackingBackendPreference;
 }
 
 interface SettingsActions {
@@ -36,6 +39,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   mouseKeyboardEnabled: true,
   showDebugOverlay: false,
   preferredCameraId: null,
+  trackingBackend: 'auto',
 };
 
 export const SETTINGS_STORAGE_KEY = 'gestur3d.settings';
