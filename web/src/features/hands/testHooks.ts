@@ -24,6 +24,8 @@ export interface GrabScript {
   dropoutMs?: number;
   /** Uniform landmark noise, camera-normalized. */
   jitter?: number;
+  /** Playback speed (< 1 = slower, for capturing screenshots). */
+  speed?: number;
 }
 
 const ASPECT = 16 / 9;
@@ -49,10 +51,13 @@ function wristAt(uv: UV, pinch: number, handedness: Handedness): [number, number
   });
 }
 
-function play(recording: Recording): Promise<void> {
+function play(recording: Recording, speed = 1): Promise<void> {
   return new Promise((resolve) => {
     useHandTracking.getState().source?.dispose();
-    const source = new ReplayHandSource(recording, { onEnd: () => setTimeout(resolve, 150) });
+    const source = new ReplayHandSource(recording, {
+      speed,
+      onEnd: () => setTimeout(resolve, 150),
+    });
     useHandTracking.getState().set({
       status: 'running',
       source,
@@ -120,7 +125,7 @@ export function installTestHooks() {
       return { u: (p.x - r.left) / r.width, v: (p.y - r.top) / r.height };
     },
     play,
-    playGrab: (script: GrabScript) => play(grabRecording(script)),
+    playGrab: (script: GrabScript) => play(grabRecording(script), script.speed),
     /** Hold one hand still and open at a UV for `ms` (jitter / idle checks). */
     playHold: (uv: UV, ms: number, jitter = 0, handedness: Handedness = 'Right') => {
       const [cx, cy] = wristAt(uv, 0, handedness);
