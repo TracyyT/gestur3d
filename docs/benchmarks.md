@@ -13,14 +13,19 @@ Only measured numbers go here, each with the date, commit and machine. Empty cel
 
 ## Milestone 1
 
-| Metric                                       | Value | Date | Commit | Notes                   |
-| -------------------------------------------- | ----- | ---- | ------ | ----------------------- |
-| Landing hero render FPS (1080p window)       |       |      |        | Target ≥ 55             |
-| Workspace render FPS, idle, quality Auto     |       |      |        |                         |
-| Workspace render FPS, dragging, quality High |       |      |        |                         |
-| Detection FPS, 2 hands, setup screen (GPU)   |       |      |        | Camera-rate bound (~30) |
-| Detection time per frame, 2 hands (GPU)      |       |      |        |                         |
-| Lighthouse accessibility, landing            |       |      |        | Target ≥ 90             |
+Measured 2026-11-20 at commit `631ed59` on the reference machine, with DevTools docked (page area about 950 px wide).
+
+| Metric                                   | Value                  | Notes                                                                                          |
+| ---------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------- |
+| Landing hero render FPS                  | 120 fps                | DevTools frame-rendering stats. Capped by the 120 Hz display.                                  |
+| Workspace render, idle, quality High     | 120 fps · 8.3 ms       | HUD. Capped by the display, so 8.3 ms is the frame interval, not the GPU cost.                 |
+| Workspace render, dragging, quality High |                        | Not measured yet                                                                               |
+| Hand detection, 1 hand, setup screen     | 30 fps · 12.0 ms · GPU | Detection rate is bound by the camera's 30 fps. 12.0 ms is time inside the detector per frame. |
+| Hand detection, 2 hands                  |                        | Not measured yet                                                                               |
+| Lighthouse accessibility, `/workspace`   | 100                    | Desktop. 22 audits passed.                                                                     |
+| Lighthouse accessibility, landing        |                        | Not measured yet                                                                               |
+
+Because both render readings hit the display's 120 Hz cap, they show that rendering keeps up, not how much headroom is left. GPU frame cost needs a DevTools Performance trace, planned for the M6 performance pass.
 
 ### Bundle (measured 2026-11-20, production build)
 
