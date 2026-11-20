@@ -40,9 +40,10 @@ export function clampToViewport(
   size: { w: number; h: number },
   viewport: { w: number; h: number },
   margin = 12,
+  top = margin,
 ) {
   return {
     x: Math.min(Math.max(margin, pos.x), Math.max(margin, viewport.w - size.w - margin)),
-    y: Math.min(Math.max(margin, pos.y), Math.max(margin, viewport.h - size.h - margin)),
+    y: Math.min(Math.max(top, pos.y), Math.max(top, viewport.h - size.h - margin)),
   };
 }
