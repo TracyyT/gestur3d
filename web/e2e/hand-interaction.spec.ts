@@ -30,6 +30,33 @@ declare global {
 }
 
 async function open(page: Page, width: number, height: number, panels: boolean) {
+  // HAND_E2E_CPU_THROTTLE=4 simulates a slow machine (few rendered frames per
+  // detection) to check interactions don't depend on the render rate.
+  const throttle = Number(process.env.HAND_E2E_CPU_THROTTLE ?? 0);
+  if (throttle > 1) {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
+  }
+  // HAND_E2E_FRAME_STALL_MS=250 stalls every rendered frame, like CI's software
+  // GPU, so several detections pile up between renders.
+  const stall = Number(process.env.HAND_E2E_FRAME_STALL_MS ?? 0);
+  if (stall > 0) {
+    await page.addInitScript((ms: number) => {
+      const raf = window.requestAnimationFrame.bind(window);
+      let lastStall = -1;
+      window.requestAnimationFrame = (cb) =>
+        raf((t) => {
+          if (t !== lastStall) {
+            lastStall = t;
+            const end = performance.now() + ms;
+            while (performance.now() < end) {
+              /* stall this frame */
+            }
+          }
+          cb(t);
+        });
+    }, stall);
+  }
   await page.setViewportSize({ width, height });
   await page.addInitScript(() => {
     window.__G3D_TEST_HOOKS__ = true;
@@ -38,14 +65,12 @@ async function open(page: Page, width: number, height: number, panels: boolean) 
   if (!panels) await page.getByRole('button', { name: 'Hide panels' }).click();
   // Wait until the scene has rendered and can project objects.
   await expect
-    .poll(() => page.evaluate(() => window.__G3D__?.objectUV('obj-2') ?? null))
+    .poll(() => page.evaluate(() => window.__G3D__?.objectUV('obj-2') ?? null), { timeout: 30_000 })
     .not.toBeNull();
   await page.waitForTimeout(600); // let panel framing settle
 }
 
 const positions = (page: Page) => page.evaluate(() => window.__G3D__.objects());
-const position = async (page: Page, id: string) =>
-  (await positions(page)).find((o) => o.id === id)!.position;
 
 const MATRIX: Array<[string, number, number, boolean, 'Left' | 'Right']> = [
   ['1440×900, panels open, right hand', 1440, 900, true, 'Right'],
@@ -149,14 +174,20 @@ test('a long dropout releases the object in place; it does not jump to the retur
     [from, to] as const,
   );
 
-  const firstLost = samples.findIndex((s) => s.phase === 'lost');
-  expect(firstLost, JSON.stringify(samples)).toBeGreaterThan(0);
-  // From the moment tracking was lost, the object never moves again: it was
-  // released in place, and the hand came back still pinched (no re-grab).
-  const atLoss = samples[firstLost]!.pos;
-  for (const s of samples.slice(firstLost)) expect(s.pos, JSON.stringify(samples)).toEqual(atLoss);
-  expect(await position(page, 'obj-2')).toEqual(atLoss);
+  // The script drops the hand halfway through the move. Released in place
+  // means the object stays at that halfway point instead of reaching `to`,
+  // and the hand coming back pinched doesn't pick it up again.
+  const end = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
+  const mid = { u: (from.u + to.u) / 2, v: (from.v + to.v) / 2 };
+  expect(Math.hypot(end.u - mid.u, end.v - mid.v)).toBeLessThan(0.03);
+  expect(Math.hypot(end.u - to.u, end.v - to.v)).toBeGreaterThan(0.05);
   expect(await page.evaluate(() => window.__G3D__.pointers().some((p) => p.grabbedId))).toBe(false);
+  // Any frame rendered after tracking was lost shows the object still.
+  const firstLost = samples.findIndex((s) => s.phase === 'lost');
+  if (firstLost >= 0) {
+    for (const s of samples.slice(firstLost))
+      expect(s.pos, JSON.stringify(samples)).toEqual(samples[firstLost]!.pos);
+  }
 });
 
 test('a closed pinch swept across an object does not grab it', async ({ page }) => {
