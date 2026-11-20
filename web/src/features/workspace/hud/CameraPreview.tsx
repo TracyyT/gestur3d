@@ -8,6 +8,8 @@ import { GlassPanel, IconButton, buttonClasses } from '@/ui';
 
 const WIDTH = 248;
 const KEY_STEP = 24;
+/** Keeps the preview below the top bar so it never covers the home link. */
+const TOP_INSET = 64;
 
 function defaultPos(height: number, viewportHeight: number) {
   return { x: 16, y: viewportHeight - height - 72 };
@@ -52,7 +54,13 @@ export function CameraPreview() {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const pos = clampToViewport(previewPos ?? defaultPos(box.h, viewport.h), box, viewport);
+  const pos = clampToViewport(
+    previewPos ?? defaultPos(box.h, viewport.h),
+    box,
+    viewport,
+    12,
+    TOP_INSET,
+  );
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || (e.target as HTMLElement).closest('button,a')) return;
@@ -62,7 +70,9 @@ export function CameraPreview() {
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
-    setPreviewPos(clampToViewport({ x: e.clientX - d.dx, y: e.clientY - d.dy }, box, viewport));
+    setPreviewPos(
+      clampToViewport({ x: e.clientX - d.dx, y: e.clientY - d.dy }, box, viewport, 12, TOP_INSET),
+    );
   };
   const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
     if (drag.current?.id === e.pointerId) drag.current = null;
@@ -77,7 +87,9 @@ export function CameraPreview() {
     const d = delta[e.key];
     if (!d) return;
     e.preventDefault();
-    setPreviewPos(clampToViewport({ x: pos.x + d[0], y: pos.y + d[1] }, box, viewport));
+    setPreviewPos(
+      clampToViewport({ x: pos.x + d[0], y: pos.y + d[1] }, box, viewport, 12, TOP_INSET),
+    );
   };
 
   return (

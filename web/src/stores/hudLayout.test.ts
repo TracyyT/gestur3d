@@ -28,4 +28,10 @@ describe('renderStats', () => {
     expect(fps).toBeCloseTo(60, 0);
     expect(frameMs).toBeCloseTo(16.67, 1);
   });
+
+  it('respects a larger top inset', () => {
+    const size = { w: 200, h: 100 };
+    const vp = { w: 800, h: 600 };
+    expect(clampToViewport({ x: 0, y: 0 }, size, vp, 12, 64)).toEqual({ x: 12, y: 64 });
+  });
 });
