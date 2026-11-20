@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useCameraSession } from '@/features/camera/cameraSession';
 import { HandOverlay } from '@/features/camera/HandOverlay';
@@ -8,8 +8,8 @@ import { Button, GlassPanel, Logo, Select, StatusPill, buttonClasses } from '@/u
 import { CalibrationChecklist } from './CalibrationChecklist';
 import { CameraErrorView } from './CameraErrorView';
 import { PermissionIntro } from './PermissionIntro';
-import { buildChecks } from './checks';
-import { ThumbsUpHint, ThumbsUpPreviewBadge } from './ThumbsUpHint';
+import { buildChecks, thumbsUpCheck } from './checks';
+import { ThumbsUpPreviewBadge } from './ThumbsUpBadge';
 import { useThumbsUpHold } from './useThumbsUpHold';
 
 /** Decorative corner brackets that frame the live preview like a HUD viewport. */
@@ -40,6 +40,12 @@ export function SetupPage() {
   );
   const allGood = checks.every((c) => c.state === 'pass');
 
+  // Once calibration has passed, the thumbs-up step stays unlocked (moving a
+  // hand into a thumbs-up can briefly flip a check). Resets if the camera stops.
+  const [calibrated, setCalibrated] = useState(false);
+  if (allGood && !calibrated) setCalibrated(true);
+  if (!live && calibrated) setCalibrated(false);
+
   // Both hands are busy during calibration, so a held thumbs-up also enters.
   const getAspect = useCallback(() => {
     const v = videoRef.current;
@@ -49,7 +55,7 @@ export function SetupPage() {
   const thumbsProgress = useThumbsUpHold(
     tracking.latest,
     getAspect,
-    tracking.status === 'ready',
+    tracking.status === 'ready' && calibrated,
     enterWorkspace,
   );
 
@@ -159,11 +165,12 @@ export function SetupPage() {
             <GlassPanel className="flex flex-col p-6">
               <h1 className="text-[18px] font-semibold tracking-tight">Calibrate</h1>
               <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-2">
-                Sit about an arm’s length from the screen and raise both hands. When the checks are
-                green, give a thumbs-up.
+                Sit about an arm’s length away and raise both hands.
               </p>
               <div className="mt-6">
-                <CalibrationChecklist items={checks} />
+                <CalibrationChecklist
+                  items={[...checks, thumbsUpCheck(calibrated, thumbsProgress)]}
+                />
               </div>
 
               {tracking.status === 'error' && (
@@ -179,7 +186,6 @@ export function SetupPage() {
               </ul>
 
               <div className="mt-auto flex flex-col gap-3 pt-8">
-                {tracking.status === 'ready' && <ThumbsUpHint progress={thumbsProgress} />}
                 <Button
                   variant={allGood ? 'primary' : 'secondary'}
                   size="lg"

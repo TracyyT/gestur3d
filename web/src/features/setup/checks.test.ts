@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildChecks } from './checks';
+import { buildChecks, thumbsUpCheck } from './checks';
 
 const hand = (palm: number) => ({ handedness: 'Right' as const, score: 0.9, palm });
 
@@ -36,5 +36,18 @@ describe('buildChecks', () => {
     );
     expect(distance!.detail).toMatch(/closer/);
     expect(light!.detail).toMatch(/dark/i);
+  });
+});
+
+describe('thumbsUpCheck', () => {
+  it('is locked until the other checks pass', () => {
+    expect(thumbsUpCheck(false, 0.5).state).toBe('locked');
+  });
+
+  it('is active with progress once unlocked', () => {
+    const c = thumbsUpCheck(true, 0.4);
+    expect(c.state).toBe('active');
+    expect(c.progress).toBe(0.4);
+    expect(c.detail).toMatch(/keep holding/i);
   });
 });
