@@ -75,3 +75,9 @@ export function screenToNdc(
 ): [number, number] {
   return [(x / canvasWidth) * 2 - 1, -((y / canvasHeight) * 2 - 1)];
 }
+
+/** Inverse of cameraToScreen: scene-rect position (u, v in 0..1) → raw camera point. */
+export function screenToCamera(u: number, v: number, box: Box): [number, number] {
+  const mirroredX = box.x0 + u * (box.x1 - box.x0);
+  return [1 - mirroredX, box.y0 + v * (box.y1 - box.y0)];
+}
