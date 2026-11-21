@@ -175,6 +175,8 @@ export function installTestHooks() {
         scale: o.scale,
       })),
     twoHand: () => handRuntime.twoHand.map((t) => ({ ...t })),
+    /** Two-hand mode changes seen by the engine (every detection frame, not just rendered ones). */
+    twoHandModes: () => [...handRuntime.twoHandModes],
     /** Script time (ms) of the last detection frame the engine processed, during replay. */
     scriptTime: () => {
       const source = useHandTracking.getState().source;
