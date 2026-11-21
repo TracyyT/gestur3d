@@ -96,6 +96,39 @@ test.describe('workspace panels', () => {
     );
   });
 
+  test('Undo takes back adds, removes and recolors, from the panel and the keyboard', async ({
+    page,
+  }) => {
+    await page.goto('/workspace');
+    const list = page.getByRole('list', { name: 'Objects in the scene' }).getByRole('listitem');
+    const undo = page.getByRole('button', { name: 'Undo', exact: true });
+    await expect(undo).toBeDisabled();
+
+    await page.getByRole('button', { name: 'Add gyroscope' }).click();
+    await expect(list).toHaveCount(4);
+    await page
+      .getByRole('group', { name: 'Color' })
+      .getByRole('button', { name: 'Violet' })
+      .click();
+    await page.getByRole('button', { name: 'Remove selected' }).click();
+    await expect(list).toHaveCount(3);
+
+    await undo.click(); // restore the gyroscope
+    await expect(list).toHaveCount(4);
+    await expect(
+      page.getByRole('group', { name: 'Color' }).getByRole('button', { name: 'Violet' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+
+    await page.getByRole('application').focus();
+    await page.keyboard.press('ControlOrMeta+z'); // undo the color
+    await expect(
+      page.getByRole('group', { name: 'Color' }).getByRole('button', { name: 'Violet' }),
+    ).toHaveAttribute('aria-pressed', 'false');
+    await page.keyboard.press('ControlOrMeta+z'); // undo the add
+    await expect(list).toHaveCount(3);
+    await expect(undo).toBeDisabled();
+  });
+
   test('panels can be hidden and shown', async ({ page }) => {
     await page.goto('/workspace');
     const panels = page.getByRole('complementary', { name: 'Workspace panels' });

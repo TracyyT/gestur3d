@@ -37,6 +37,8 @@ export type Command =
   | { type: 'setColor'; id: string; color: HoloColor | null }
   | { type: 'add'; kind: ObjectKind }
   | { type: 'remove'; id: string }
+  /** Put a removed object back where it was (used by Undo). */
+  | { type: 'restore'; object: SceneObject; index: number; selected: boolean }
   | { type: 'reset' };
 
 export interface SceneObject {
