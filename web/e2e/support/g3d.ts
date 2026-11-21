@@ -20,7 +20,12 @@ export interface G3D {
     grabbedId: string | null;
     tip?: { x: number; y: number };
   }>;
-  twoHand(): Array<{ mode: string; pointerIds: [number, number] }>;
+  twoHand(): Array<{
+    mode: string;
+    pointerIds: [number, number];
+    spread: number;
+    turn: number;
+  }>;
   objectUV(id: string): UV | null;
   scriptTime(): number | null;
   sceneRect(): { left: number; top: number; width: number; height: number };

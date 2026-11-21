@@ -73,6 +73,10 @@ export interface TwoHandInfo {
   /** Id of a hand that is in the grab but lost, if any. */
   lostId: number | null;
   scaleFactor: number;
+  /** Raw fingertip spread relative to the last snapshot (see BimanualResult). */
+  spread: number;
+  /** Raw turn of the fingertip line since the last snapshot, radians. */
+  turn: number;
   /** Roll since the two-hand grab started, radians. */
   roll: number;
   /** Depth moved since the last snapshot, world units toward the camera. */
@@ -262,6 +266,8 @@ export class HandInteractionEngine {
               mode: 'frozen',
               lostId: null,
               scaleFactor: 1,
+              spread: 1,
+              turn: 0,
               roll: 0,
               depth: 0,
               scale: pose.scale,
@@ -504,6 +510,8 @@ export class HandInteractionEngine {
           s.info = {
             ...s.info,
             scaleFactor: r.scaleFactor,
+            spread: r.spread,
+            turn: r.turn,
             roll: r.roll,
             depth: r.depth,
             scale: r.scale,
