@@ -458,6 +458,8 @@ test.describe('two-hand grab', () => {
         expect(dz).toBeLessThan(0.65);
         // ...without growing: the spread is measured in palm widths.
         expect(Math.abs(after.scale / before.scale - 1)).toBeLessThan(0.04);
+        // The readout says it came closer.
+        expect(samples.some((s) => /closer$/.test(s.chip ?? ''))).toBe(true);
       } else {
         expect(Math.abs(dz)).toBeLessThan(1e-6);
         // With depth off, the wider on-screen spread scales it instead.
