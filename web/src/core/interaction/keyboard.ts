@@ -23,6 +23,7 @@ export const SHORTCUTS: ReadonlyArray<{ keys: string[]; action: string }> = [
   { keys: ['Del'], action: 'Remove selected object' },
   { keys: ['Ctrl Z', '⌘ Z'], action: 'Undo add, remove or color' },
   { keys: ['Esc'], action: 'Deselect' },
+  { keys: ['M'], action: 'Open the radial menu (arrows, Enter, Esc)' },
   { keys: ['?'], action: 'Show or hide shortcuts' },
 ];
 

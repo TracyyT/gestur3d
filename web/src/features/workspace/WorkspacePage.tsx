@@ -5,6 +5,7 @@ import { supportsWebGL2 } from '@/lib/webgl';
 import { useScene } from '@/stores/scene';
 import { GlassPanel, Kbd, Logo } from '@/ui';
 import { HandCursorOverlay } from '@/features/hands/HandCursorOverlay';
+import { RadialMenu } from '@/features/menu/RadialMenu';
 import { installTestHooks } from '@/features/hands/testHooks';
 import { useWorkspaceHandSource } from '@/features/hands/useWorkspaceHandSource';
 import { Hud } from './hud/Hud';
@@ -68,6 +69,7 @@ export function WorkspacePage() {
         )}
       </div>
 
+      <RadialMenu />
       <HandCursorOverlay />
       <SelectionAnnouncer />
       <Hud />

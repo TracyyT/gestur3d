@@ -148,3 +148,72 @@ test.describe('workspace panels', () => {
     await expect(page.getByLabel('Visual quality')).toHaveValue('low');
   });
 });
+
+test.describe('radial menu', () => {
+  test('M opens it; arrows and Enter add an object from the outer ring; Esc closes', async ({
+    page,
+  }) => {
+    await page.goto('/workspace');
+    const scene = page.getByRole('application');
+    const menu = page.getByRole('menu', { name: 'Radial menu' });
+    const list = page.getByRole('list', { name: 'Objects in the scene' }).getByRole('listitem');
+    await scene.focus();
+    await page.keyboard.press('m');
+    await expect(menu).toBeVisible();
+    await page.keyboard.press('ArrowRight'); // Add (first sector)
+    await page.keyboard.press('Enter'); // into the outer ring: Sphere
+    await page.keyboard.press('ArrowRight'); // Cube
+    await page.keyboard.press('Enter');
+    await expect(menu).toBeHidden();
+    await expect(list).toHaveCount(4);
+    await expect(page.locator('[aria-live="polite"]').first()).toContainText('Cube 2 selected');
+
+    await page.keyboard.press('m');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Escape'); // back to the inner ring
+    await expect(menu).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+  });
+
+  test('disabled actions do nothing; Delete and Undo work from the menu', async ({ page }) => {
+    await page.goto('/workspace');
+    const scene = page.getByRole('application');
+    const menu = page.getByRole('menu', { name: 'Radial menu' });
+    const list = page.getByRole('list', { name: 'Objects in the scene' }).getByRole('listitem');
+    await scene.focus();
+    await page.keyboard.press('m');
+    await expect(menu.getByRole('menuitem', { name: 'Delete' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await page.keyboard.press('Escape');
+
+    await page.keyboard.press('Tab'); // select the sphere
+    await page.keyboard.press('m');
+    for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight'); // Delete
+    await page.keyboard.press('Enter');
+    await expect(list).toHaveCount(2);
+    await page.keyboard.press('m');
+    for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight'); // Undo
+    await page.keyboard.press('Enter');
+    await expect(list).toHaveCount(3);
+  });
+
+  test('the mouse can point at and click menu items', async ({ page }) => {
+    await page.goto('/workspace');
+    await page.getByRole('application').focus();
+    await page.keyboard.press('m');
+    const box = (await page.getByRole('menu', { name: 'Radial menu' }).boundingBox())!;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    await page.mouse.move(cx, cy - 75); // Add
+    await page.mouse.move(cx, cy - 150); // first outer item: Sphere
+    await page.mouse.click(cx, cy - 150);
+    await expect(
+      page.getByRole('list', { name: 'Objects in the scene' }).getByRole('listitem'),
+    ).toHaveCount(4);
+    await expect(page.getByRole('menu', { name: 'Radial menu' })).toBeHidden();
+  });
+});
