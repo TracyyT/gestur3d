@@ -129,6 +129,19 @@ describe('two-hand grabs', () => {
     expect(dist(world.pos(), before)).toBeLessThan(1e-9);
   });
 
+  it('scales from the fingertip points when the hands report them', () => {
+    const { world, step } = rig();
+    // Knuckle cursors stay 100 px apart; fingertips start 50 px apart and spread to 100.
+    const at = (id: number, x: number, p: PinchState, tipX: number) =>
+      hand(id, x, 200, p, { tip: { x: tipX, y: 200 } });
+    step(at(1, 250, OPEN, 225), at(2, 150, OPEN, 175));
+    step(at(1, 250, START, 225), at(2, 150, OPEN, 175));
+    step(at(1, 250, HOLD, 225), at(2, 150, START, 175));
+    for (let i = 0; i < 60; i++) step(at(1, 250, HOLD, 250), at(2, 150, HOLD, 150));
+    expect(world.poses.get('a')!.scale).toBeGreaterThan(1.85);
+    expect(world.poses.get('a')!.scale).toBeLessThan(2);
+  });
+
   it('a second hand on a different object grabs that one on its own', () => {
     const { world, step } = rig({ a: [2, 2, 0], b: [5, 2, 0] });
     step(hand(1, 200, 200, OPEN), hand(2, 500, 200, OPEN));

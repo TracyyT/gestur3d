@@ -20,6 +20,12 @@ export interface PointerInput {
   screen: ScreenPos;
   /** False when the hand is outside the interaction box. */
   inBox: boolean;
+  /**
+   * Where the pinch point (between the fingertips) maps on screen. Two-hand
+   * scale and turn measure from here, because two hands' pinch points can
+   * meet while their knuckle cursors can't.
+   */
+  tip?: ScreenPos;
   pinch: PinchState;
 }
 
@@ -29,6 +35,8 @@ export interface HandPointer {
   handedness: Handedness;
   phase: PointerPhase;
   screen: ScreenPos;
+  /** Pinch point on screen, unsmoothed by the render easing (see PointerInput). */
+  tip?: ScreenPos;
   pinchStrength: number;
   /** Smoothed thumb-index / palm ratio, for calibration readouts. */
   pinchRatio: number;
@@ -431,13 +439,16 @@ export class HandInteractionEngine {
       const origin = s.pose.position;
       const ga = scene.planePoint(a.screen, origin);
       const gb = scene.planePoint(b.screen, origin);
+      const ta = a.tip && scene.planePoint(a.tip, origin);
+      const tb = b.tip && scene.planePoint(b.tip, origin);
+      const span = ta && tb ? ([ta, tb] as const) : undefined;
       if (ga && gb) {
         if (rebase || !s.grip) {
-          if (s.grip) s.grip.rebase(s.pose, ga, gb, now);
-          else s.grip = new BimanualGrip(s.pose, ga, gb, view, now);
+          if (s.grip) s.grip.rebase(s.pose, ga, gb, now, span);
+          else s.grip = new BimanualGrip(s.pose, ga, gb, view, now, {}, span);
         }
         if (!paused) {
-          const r = s.grip.update(ga, gb, now);
+          const r = s.grip.update(ga, gb, now, span);
           const position = clampPosition(r.position);
           const moved =
             Math.hypot(
@@ -506,6 +517,7 @@ export class HandInteractionEngine {
       handedness: input.handedness,
       phase,
       screen: input.screen,
+      tip: input.tip,
       pinchStrength: input.pinch.strength,
       pinchRatio: input.pinch.ratio,
       hoverId,

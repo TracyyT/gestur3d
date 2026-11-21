@@ -67,6 +67,9 @@ export const DEFAULT_BIMANUAL_OPTIONS: BimanualOptions = {
   rollFilter: { minCutoff: 1.0, beta: 0.6, dCutoff: 1.0 },
 };
 
+/** Two points (one per hand, same order as the grips) to measure scale and roll from. */
+export type Span = readonly [Readonly<Vec3>, Readonly<Vec3>];
+
 export interface BimanualResult extends Pose {
   /** Scale relative to the snapshot, after limits. */
   scaleFactor: number;
@@ -148,13 +151,14 @@ export class BimanualGrip {
     view: ViewBasis,
     tMs: number,
     opts: Partial<BimanualOptions> = {},
+    span?: Span,
   ) {
     this.opts = { ...DEFAULT_BIMANUAL_OPTIONS, ...opts };
     this.view = view;
     this.rollAxis = cross(view.right, view.up);
     this.scaleFilter = new OneEuroFilter(this.opts.scaleFilter);
     this.rollFilter = new OneEuroFilter(this.opts.rollFilter);
-    this.rebase(start, a, b, tMs);
+    this.rebase(start, a, b, tMs, span);
   }
 
   /** Current output, without new input. */
@@ -165,9 +169,12 @@ export class BimanualGrip {
   /**
    * Start again from `pose` with the given grips, e.g. after a hand returns.
    * The next update with the same grips returns `pose` unchanged.
+   *
+   * `span` (optional) gives separate points to measure scale and roll from,
+   * e.g. the fingertips, which can come closer together than the grips.
    */
-  rebase(pose: Pose, a: Readonly<Vec3>, b: Readonly<Vec3>, tMs: number) {
-    const d = sub(b, a);
+  rebase(pose: Pose, a: Readonly<Vec3>, b: Readonly<Vec3>, tMs: number, span?: Span) {
+    const d = span ? sub(span[1], span[0]) : sub(b, a);
     const sep = Math.hypot(d[0], d[1], d[2]);
     this.holding = sep < this.opts.minSeparation;
     this.angle = this.screenAngle(d);
@@ -192,16 +199,16 @@ export class BimanualGrip {
     };
   }
 
-  update(a: Readonly<Vec3>, b: Readonly<Vec3>, tMs: number): BimanualResult {
+  update(a: Readonly<Vec3>, b: Readonly<Vec3>, tMs: number, span?: Span): BimanualResult {
     const o = this.opts;
-    const d = sub(b, a);
+    const d = span ? sub(span[1], span[0]) : sub(b, a);
     const sep = Math.hypot(d[0], d[1], d[2]);
 
     // Hands too close: the angle and ratio are unstable. Hold scale and roll,
     // keep translating, and re-snapshot on both edges so neither jumps.
     const tooClose = sep < (this.holding ? o.minSeparation * 1.2 : o.minSeparation);
     if (tooClose !== this.holding) {
-      this.rebase(this.last, a, b, tMs);
+      this.rebase(this.last, a, b, tMs, span);
       this.holding = tooClose;
       this.last = { ...this.last, holding: tooClose };
       return this.last;
