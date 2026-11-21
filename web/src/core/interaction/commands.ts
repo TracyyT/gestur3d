@@ -18,6 +18,9 @@ export type ObjectKind =
   | 'helix'
   | 'gyroscope';
 
+/** Color choices for an object (otherwise its kind's own colors). */
+export type HoloColor = 'cyan' | 'violet' | 'white';
+
 export type InputSource = 'mouse' | 'keyboard' | 'gesture' | 'replay' | 'ui';
 
 export type Command =
@@ -30,6 +33,8 @@ export type Command =
   /** Absolute pose, e.g. from a two-hand grab. Omitted parts stay as they are. */
   | { type: 'setTransform'; id: string; position?: Vec3; rotation?: Quat; scale?: number }
   | { type: 'scaleBy'; id: string; factor: number }
+  /** null = back to the kind's own colors. */
+  | { type: 'setColor'; id: string; color: HoloColor | null }
   | { type: 'add'; kind: ObjectKind }
   | { type: 'remove'; id: string }
   | { type: 'reset' };
@@ -41,6 +46,8 @@ export interface SceneObject {
   /** Unit quaternion [x, y, z, w]. */
   rotation: Quat;
   scale: number;
+  /** Chosen color; absent = the kind's own colors. */
+  color?: HoloColor;
 }
 
 export interface SceneModel {

@@ -77,6 +77,25 @@ test.describe('workspace panels', () => {
     expect(errors).toEqual([]);
   });
 
+  test('the selected object can be recolored, and clicking again restores its colors', async ({
+    page,
+  }) => {
+    await page.goto('/workspace');
+    const color = page.getByRole('group', { name: 'Color' });
+    await expect(color).toHaveCount(0);
+    await page.getByRole('button', { name: 'Add ring' }).click();
+    await color.getByRole('button', { name: 'White' }).click();
+    await expect(color.getByRole('button', { name: 'White' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await color.getByRole('button', { name: 'White' }).click();
+    await expect(color.getByRole('button', { name: 'White' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
   test('panels can be hidden and shown', async ({ page }) => {
     await page.goto('/workspace');
     const panels = page.getByRole('complementary', { name: 'Workspace panels' });

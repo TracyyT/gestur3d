@@ -13,7 +13,7 @@ import {
   type BufferGeometry,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { ObjectKind } from '@/core/interaction/commands';
+import type { HoloColor, ObjectKind } from '@/core/interaction/commands';
 import { palette } from '@/ui/theme';
 
 /** How one kind of holographic object looks. */
@@ -142,6 +142,13 @@ export const KINDS: Record<ObjectKind, KindDefinition> = {
     spin: 0.45,
     build: () => ({ body: gyroscopeGeometry(), edges: null }),
   },
+};
+
+/** Body and rim colors for each color choice. */
+export const COLOR_STYLE: Record<HoloColor, { color: string; rim: string }> = {
+  cyan: { color: palette.cyan, rim: palette.violet },
+  violet: { color: palette.violet, rim: palette.cyan },
+  white: { color: palette.ink1, rim: palette.cyan },
 };
 
 const cache = new Map<ObjectKind, { body: BufferGeometry; edges: BufferGeometry | null }>();

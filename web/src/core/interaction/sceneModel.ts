@@ -176,6 +176,14 @@ export function applyCommand(model: SceneModel, cmd: Command): SceneModel {
         scale: clampScale(o.scale * cmd.factor),
       }));
     }
+    case 'setColor': {
+      const o = model.objects.find((x) => x.id === cmd.id);
+      if (!o || (o.color ?? null) === cmd.color) return model;
+      return update(model, cmd.id, (x) => {
+        const { color: _old, ...rest } = x;
+        return cmd.color ? { ...rest, color: cmd.color } : rest;
+      });
+    }
     case 'add': {
       if (model.objects.length >= MAX_OBJECTS) return model;
       const id = `obj-${model.nextId}`;
