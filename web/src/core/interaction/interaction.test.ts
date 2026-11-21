@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { quatFromAxisAngle, quatRotateVec3 } from '@/core/math/quat';
 import type { KeyInput } from './keyboard';
 import { keyToCommand, MOVE_STEP } from './keyboard';
 import {
@@ -56,13 +57,57 @@ describe('applyCommand', () => {
     expect(applyCommand(m, { type: 'scaleBy', id: 'obj-1', factor: -2 })).toBe(m);
   });
 
-  it('wraps rotation into (-π, π]', () => {
-    const m = applyCommand(createInitialScene(), {
-      type: 'rotate',
+  it('rotates about world axes and keeps the quaternion unit length', () => {
+    let m = createInitialScene();
+    m = applyCommand(m, { type: 'rotate', id: 'obj-1', delta: [0, Math.PI / 2, 0] });
+    const q = m.objects[0]!.rotation;
+    expect(q[1]).toBeCloseTo(Math.SQRT1_2);
+    expect(q[3]).toBeCloseTo(Math.SQRT1_2);
+    for (let i = 0; i < 1000; i++)
+      m = applyCommand(m, { type: 'rotate', id: 'obj-1', delta: [0.01, 0.02, 0.03] });
+    expect(Math.hypot(...m.objects[0]!.rotation)).toBeCloseTo(1, 10);
+    expect(applyCommand(m, { type: 'rotate', id: 'obj-1', delta: [NaN, 0, 0] })).toBe(m);
+  });
+
+  it('a world-axis turn after a tilt still spins about world up', () => {
+    let m = createInitialScene();
+    m = applyCommand(m, { type: 'rotate', id: 'obj-1', delta: [0.5, 0, 0] });
+    m = applyCommand(m, { type: 'rotate', id: 'obj-1', delta: [0, Math.PI, 0] });
+    // Up stays up: a half turn about world Y keeps the tilted Y axis's height.
+    const up = quatRotateVec3(m.objects[0]!.rotation, [0, 1, 0]);
+    expect(up[1]).toBeCloseTo(Math.cos(0.5));
+  });
+
+  it('setTransform sets an absolute pose with the usual limits', () => {
+    let m = createInitialScene();
+    const rotation = quatFromAxisAngle([0, 0, 1], 0.7);
+    m = applyCommand(m, {
+      type: 'setTransform',
       id: 'obj-1',
-      delta: [0, 3 * Math.PI, 0],
+      position: [1, 1, 1],
+      rotation,
+      scale: 2,
     });
-    expect(Math.abs(m.objects[0]!.rotation[1])).toBeCloseTo(Math.PI);
+    const o = m.objects[0]!;
+    expect(o.position).toEqual([1, 1, 1]);
+    expect(o.scale).toBe(2);
+    o.rotation.forEach((v, i) => expect(v).toBeCloseTo(rotation[i]!));
+    m = applyCommand(m, { type: 'setTransform', id: 'obj-1', position: [99, 99, 99], scale: 50 });
+    expect(m.objects[0]!.position).toEqual([BOUNDS.x, BOUNDS.yMax, BOUNDS.z]);
+    expect(m.objects[0]!.scale).toBe(SCALE_MAX);
+    // Omitted parts are kept.
+    m = applyCommand(m, { type: 'setTransform', id: 'obj-1', scale: 1 });
+    expect(m.objects[0]!.position).toEqual([BOUNDS.x, BOUNDS.yMax, BOUNDS.z]);
+  });
+
+  it('setTransform ignores invalid values', () => {
+    const m = createInitialScene();
+    expect(applyCommand(m, { type: 'setTransform', id: 'obj-1', scale: 0 })).toBe(m);
+    expect(applyCommand(m, { type: 'setTransform', id: 'obj-1', position: [NaN, 0, 0] })).toBe(m);
+    expect(
+      applyCommand(m, { type: 'setTransform', id: 'obj-1', rotation: [0, 0, Infinity, 1] }),
+    ).toBe(m);
+    expect(applyCommand(m, { type: 'setTransform', id: 'nope', scale: 2 })).toBe(m);
   });
 
   it('adds with unique ids, selects the new object and respects the cap', () => {

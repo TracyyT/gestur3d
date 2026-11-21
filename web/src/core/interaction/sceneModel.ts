@@ -1,3 +1,4 @@
+import { QUAT_IDENTITY, quatFromEuler, quatMultiply, quatNormalize } from '@/core/math/quat';
 import type { Command, ObjectKind, SceneModel, SceneObject, Vec3 } from './commands';
 
 export const SCALE_MIN = 0.3;
@@ -16,7 +17,7 @@ export function clampPosition([x, y, z]: Vec3): Vec3 {
   ];
 }
 
-const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+const clampScale = (s: number) => clamp(s, SCALE_MIN, SCALE_MAX);
 
 export const KIND_LABEL: Record<ObjectKind, string> = {
   sphere: 'Sphere',
@@ -26,9 +27,27 @@ export const KIND_LABEL: Record<ObjectKind, string> = {
 
 export function createInitialScene(): SceneModel {
   const objects: SceneObject[] = [
-    { id: 'obj-1', kind: 'sphere', position: [-1.9, 0.25, 0], rotation: [0, 0, 0], scale: 1 },
-    { id: 'obj-2', kind: 'cube', position: [0, 0.25, -0.4], rotation: [0.35, 0.6, 0], scale: 1 },
-    { id: 'obj-3', kind: 'sculpture', position: [1.9, 0.25, 0], rotation: [0, 0, 0], scale: 1 },
+    {
+      id: 'obj-1',
+      kind: 'sphere',
+      position: [-1.9, 0.25, 0],
+      rotation: [...QUAT_IDENTITY],
+      scale: 1,
+    },
+    {
+      id: 'obj-2',
+      kind: 'cube',
+      position: [0, 0.25, -0.4],
+      rotation: quatFromEuler([0.35, 0.6, 0]),
+      scale: 1,
+    },
+    {
+      id: 'obj-3',
+      kind: 'sculpture',
+      position: [1.9, 0.25, 0],
+      rotation: [...QUAT_IDENTITY],
+      scale: 1,
+    },
   ];
   return { objects, selectedId: null, nextId: 4 };
 }
@@ -74,20 +93,33 @@ export function applyCommand(model: SceneModel, cmd: Command): SceneModel {
           o.position[2] + cmd.delta[2],
         ]),
       }));
-    case 'rotate':
+    case 'rotate': {
+      if (!cmd.delta.every(Number.isFinite)) return model;
+      // World-axis turn: applied after the current rotation, so "rotate right"
+      // always turns the object right on screen, however it is already tilted.
+      const turn = quatFromEuler(cmd.delta);
       return update(model, cmd.id, (o) => ({
         ...o,
-        rotation: [
-          wrapAngle(o.rotation[0] + cmd.delta[0]),
-          wrapAngle(o.rotation[1] + cmd.delta[1]),
-          wrapAngle(o.rotation[2] + cmd.delta[2]),
-        ],
+        rotation: quatNormalize(quatMultiply(turn, o.rotation)),
       }));
+    }
+    case 'setTransform': {
+      const { position, rotation, scale } = cmd;
+      if (position && !position.every(Number.isFinite)) return model;
+      if (rotation && !rotation.every(Number.isFinite)) return model;
+      if (scale !== undefined && !(scale > 0 && Number.isFinite(scale))) return model;
+      return update(model, cmd.id, (o) => ({
+        ...o,
+        position: position ? clampPosition(position) : o.position,
+        rotation: rotation ? quatNormalize(rotation) : o.rotation,
+        scale: scale !== undefined ? clampScale(scale) : o.scale,
+      }));
+    }
     case 'scaleBy': {
       if (!(cmd.factor > 0) || !Number.isFinite(cmd.factor)) return model;
       return update(model, cmd.id, (o) => ({
         ...o,
-        scale: clamp(o.scale * cmd.factor, SCALE_MIN, SCALE_MAX),
+        scale: clampScale(o.scale * cmd.factor),
       }));
     }
     case 'add': {
@@ -97,7 +129,7 @@ export function applyCommand(model: SceneModel, cmd: Command): SceneModel {
         id,
         kind: cmd.kind,
         position: spawnPosition(model),
-        rotation: [0, 0, 0],
+        rotation: [...QUAT_IDENTITY],
         scale: 1,
       };
       return { objects: [...model.objects, obj], selectedId: id, nextId: model.nextId + 1 };
