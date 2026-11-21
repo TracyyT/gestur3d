@@ -7,7 +7,10 @@
  * - scale follows the ratio of their separation to the separation at the start,
  * - roll follows the angle of the line between them, in the view plane.
  *
- * The pivot is the midpoint, so the object stays under the hands. Every pose is
+ * Scale and roll pivot on the object's own center by default, so an object
+ * held from a distance (hands off to one side, or far apart) turns and grows in
+ * place instead of orbiting the hands. With `pivot: 'hands'` they pivot on the
+ * midpoint instead, which keeps the object under the fingers. Every pose is
  * computed from a snapshot taken when the grip starts (never by summing
  * per-frame deltas), so the first frame reproduces the starting pose exactly
  * and nothing drifts. Callers take a new snapshot whenever the set of hands
@@ -36,6 +39,8 @@ export interface ViewBasis {
 }
 
 export interface BimanualOptions {
+  /** What scale and roll turn around: the object's center, or the hands' midpoint. */
+  pivot: 'object' | 'hands';
   scaleMin: number;
   scaleMax: number;
   /** Log-space band below each scale limit where scaling eases into the limit. */
@@ -51,6 +56,7 @@ export interface BimanualOptions {
 }
 
 export const DEFAULT_BIMANUAL_OPTIONS: BimanualOptions = {
+  pivot: 'object',
   scaleMin: 0.3,
   scaleMax: 3,
   softBand: Math.log(1.15),
@@ -224,9 +230,12 @@ export class BimanualGrip {
     const k = scale / s0;
 
     const turn = quatFromAxisAngle(this.rollAxis, roll);
-    const offset = quatRotateVec3(turn, mul(sub(this.snap.pose.position, this.snap.pivot), k));
+    const position =
+      o.pivot === 'hands'
+        ? add(pivot, quatRotateVec3(turn, mul(sub(this.snap.pose.position, this.snap.pivot), k)))
+        : add(this.snap.pose.position, sub(pivot, this.snap.pivot));
     this.last = {
-      position: add(pivot, offset),
+      position,
       rotation: quatNormalize(quatMultiply(turn, this.snap.pose.rotation)),
       scale,
       scaleFactor: k,

@@ -117,15 +117,16 @@ describe('two-hand grabs', () => {
     expect(dist(world.pos(), before)).toBeLessThan(1e-9);
   });
 
-  it('spreading the hands scales the object about their midpoint', () => {
+  it('spreading the hands scales the object in place', () => {
     const { world, step, joinTwo } = rig();
+    const before = [...world.pos()] as Vec3;
     joinTwo();
     let r!: EngineResult;
     for (let i = 0; i < 60; i++) r = step(hand(1, 150, 200, HOLD), hand(2, 270, 200, HOLD));
     expect(r.twoHand[0]!.mode).toBe('two');
     expect(world.poses.get('a')!.scale).toBeGreaterThan(2.5);
-    // Midpoint stayed at x = 2.1, so x stays near where it was, scaled about it.
-    expect(world.pos()[0]).toBeCloseTo(2.1 + (2 - 2.1) * world.poses.get('a')!.scale, 1);
+    // The midpoint (x = 2.1) didn't move, and scaling is about the object's center.
+    expect(dist(world.pos(), before)).toBeLessThan(1e-9);
   });
 
   it('a second hand on a different object grabs that one on its own', () => {

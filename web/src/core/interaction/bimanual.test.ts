@@ -57,11 +57,17 @@ describe('BimanualGrip', () => {
     expect(quatAngleBetween(r.rotation, START.rotation)).toBeCloseTo(0);
   });
 
-  it('scales with hand separation about the midpoint', () => {
+  it('scales with hand separation, in place', () => {
     const g = new BimanualGrip(START, L, R, VIEW, 0, EXACT);
     const r = g.update([-2, 0, 0], [2, 0, 0], 33);
     expect(r.scale).toBeCloseTo(2);
-    // The object's offset from the pivot doubles too.
+    closeVec(r.position, START.position);
+  });
+
+  it('with the hands as pivot, scaling moves the object away from the midpoint', () => {
+    const g = new BimanualGrip(START, L, R, VIEW, 0, { ...EXACT, pivot: 'hands' });
+    const r = g.update([-2, 0, 0], [2, 0, 0], 33);
+    expect(r.scale).toBeCloseTo(2);
     closeVec(r.position, [0, 0.5, 0]);
   });
 
@@ -71,17 +77,27 @@ describe('BimanualGrip', () => {
     const r = g.update(a, b, 33);
     expect(r.roll).toBeCloseTo(Math.PI / 2);
     expect(quatAngleBetween(r.rotation, quatFromAxisAngle([0, 0, 1], Math.PI / 2))).toBeCloseTo(0);
-    // Offset (0, 0.25) turned 90° CCW about the pivot.
-    closeVec(r.position, [-0.25, 0, 0]);
+    // Turns about its own center: it stays put.
+    closeVec(r.position, START.position);
   });
 
-  it('keeps both grip points attached to the object', () => {
+  it('held from far to one side, turning does not swing the object around the hands', () => {
+    const far: Vec3[] = [
+      [-6, 0, 0],
+      [-4, 0, 0],
+    ];
+    const g = new BimanualGrip(START, far[0]!, far[1]!, VIEW, 0, EXACT);
+    const [a, b] = hands([-5, 0, 0], 1, Math.PI / 2);
+    closeVec(g.update(a, b, 33).position, START.position);
+  });
+
+  it('with the hands as pivot, keeps both grip points attached to the object', () => {
     const start: Pose = {
       position: [0.3, -0.2, 0.1],
       rotation: quatFromAxisAngle([1, 1, 0], 0.6),
       scale: 1.2,
     };
-    const g = new BimanualGrip(start, L, R, VIEW, 0, EXACT);
+    const g = new BimanualGrip(start, L, R, VIEW, 0, { ...EXACT, pivot: 'hands' });
     // Where the grips sit in the object's own frame at the start.
     const local = (p: Vec3) =>
       quatRotateVec3(
