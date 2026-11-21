@@ -1,0 +1,39 @@
+/** Types for the test-only `window.__G3D__` API (src/features/hands/testHooks.ts). */
+export type UV = { u: number; v: number };
+export type Vec3 = [number, number, number];
+export type Quat = [number, number, number, number];
+export type Handedness = 'Left' | 'Right';
+
+export interface HandKey extends UV {
+  at: number;
+  pinch: number;
+  visible?: boolean;
+}
+
+export interface G3D {
+  objects(): Array<{ id: string; position: Vec3; rotation: Quat; scale: number }>;
+  selectedId(): string | null;
+  pointers(): Array<{ phase: string; grabbedId: string | null }>;
+  twoHand(): Array<{ mode: string; pointerIds: [number, number] }>;
+  objectUV(id: string): UV | null;
+  scriptTime(): number | null;
+  sceneRect(): { left: number; top: number; width: number; height: number };
+  playGrab(s: {
+    from: UV;
+    to: UV;
+    handedness?: Handedness;
+    dropoutMs?: number;
+    grip?: number;
+    loosenTo?: number;
+  }): Promise<void>;
+  playSweep(from: UV, to: UV, handedness?: Handedness): Promise<void>;
+  playHold(uv: UV, ms: number, jitter?: number): Promise<void>;
+  playTwoHand(s: { right: HandKey[]; left: HandKey[] }): Promise<void>;
+}
+
+declare global {
+  interface Window {
+    __G3D__: G3D;
+    __G3D_TEST_HOOKS__?: boolean;
+  }
+}

@@ -1,6 +1,8 @@
 import type { PinchState } from '@/core/tracking/pinch';
 import type { Handedness } from '@/core/vision/types';
+import { BimanualGrip, type Pose, type ViewBasis } from './bimanual';
 import type { Command, Vec3 } from './commands';
+import { clampPosition } from './sceneModel';
 
 /** What a hand is doing, from the user's point of view. */
 export type PointerPhase = 'tracking' | 'hovering' | 'pinching' | 'grabbing' | 'lost';
@@ -43,6 +45,32 @@ export interface SceneQuery {
   /** Where the ray through `screen` meets the camera-facing plane through `origin`. */
   planePoint(screen: ScreenPos, origin: Vec3): Vec3 | null;
   objectPosition(id: string): Vec3 | null;
+  /** Full pose; defaults to the position with no rotation and scale 1. */
+  objectPose?(id: string): Pose | null;
+  /** True if `screen` is within `slack` × the object's on-screen radius of its center. */
+  near?(screen: ScreenPos, id: string, slack: number): boolean;
+  /** Camera axes in world space; defaults to +X right, +Y up. */
+  view?(): ViewBasis;
+}
+
+/** What a two-hand grab is doing this frame. */
+export type TwoHandMode = 'two' | 'one' | 'frozen';
+
+export interface TwoHandInfo {
+  objectId: string;
+  /** Pointer ids, lower first. */
+  pointerIds: [number, number];
+  /** 'two' = both hands driving; 'one' = one hand lost, the other moving; 'frozen' = neither. */
+  mode: TwoHandMode;
+  /** Id of a hand that is in the grab but lost, if any. */
+  lostId: number | null;
+  scaleFactor: number;
+  /** Roll since the two-hand grab started, radians. */
+  roll: number;
+  scale: number;
+  atLimit: boolean;
+  /** Hands too close together: scale and roll hold. */
+  holding: boolean;
 }
 
 export interface EngineResult {
@@ -52,6 +80,8 @@ export interface EngineResult {
   held: Map<string, number>;
   /** True while any hand is grabbing (for the HUD mode readout). */
   grabbing: boolean;
+  /** Active two-hand grabs. */
+  twoHand: TwoHandInfo[];
 }
 
 interface GrabState {
@@ -70,7 +100,23 @@ interface PointerMemory {
   releasedAt: number | null;
 }
 
+interface TwoHandSession {
+  objectId: string;
+  ids: [number, number];
+  /** Null until both hands drive it, and while it isn't in 'two' mode. */
+  grip: BimanualGrip | null;
+  /** Who was driving on the previous frame: 'two', a pointer id, or 'none'. */
+  driver: 'two' | number | 'none';
+  /** Either hand's fingers are opening: hold everything still. */
+  paused: boolean;
+  pose: Pose;
+  info: TwoHandInfo;
+}
+
 const MOVE_EPSILON = 1e-4;
+/** A second hand joins if it pinches within this × the held object's on-screen radius. */
+export const JOIN_SLACK = 1.3;
+const DEFAULT_VIEW: ViewBasis = { right: [1, 0, 0], up: [0, 1, 0] };
 
 /**
  * Hover / grab / move / release for hands.
@@ -86,9 +132,20 @@ const MOVE_EPSILON = 1e-4;
  * - Tracking lost: the object freezes in place. If the hand comes back (same
  *   track, within the tracker's grace period) the grab continues; if the track
  *   expires, the object is released where it is.
+ *
+ * Two hands:
+ * - A second hand that starts a pinch on (or next to) an object held by one
+ *   hand joins the grab. Both hands then move, scale and roll it
+ *   (`BimanualGrip`).
+ * - Whenever the set of hands driving the object changes (join, release, a hand
+ *   lost or back), the drivers re-anchor on the object's current pose, so it
+ *   never jumps. Scale and rotation reached with two hands are kept.
+ * - One hand lost: the other keeps moving it; scale and rotation hold. Both
+ *   lost: it freezes. A hand whose track expires leaves the grab.
  */
 export class HandInteractionEngine {
   private memory = new Map<number, PointerMemory>();
+  private sessions = new Map<string, TwoHandSession>();
 
   update(
     now: number,
@@ -98,13 +155,19 @@ export class HandInteractionEngine {
   ): EngineResult {
     const commands: Command[] = [];
     const held = new Map<string, number>();
-    for (const [id, m] of this.memory) if (m.grab) held.set(m.grab.objectId, id);
+    for (const [id, m] of this.memory)
+      if (m.grab && !held.has(m.grab.objectId)) held.set(m.grab.objectId, id);
+    const byId = new Map(inputs.map((p) => [p.id, p]));
 
-    // Tracks that disappeared: release whatever they held, in place.
-    const live = new Set(inputs.map((p) => p.id));
+    // Tracks that disappeared: release whatever they held, in place. A hand
+    // that leaves a two-hand grab hands the object to the other.
     for (const [id, m] of this.memory) {
-      if (live.has(id)) continue;
-      if (m.grab) held.delete(m.grab.objectId);
+      if (byId.has(id)) continue;
+      if (m.grab) {
+        const session = this.sessions.get(m.grab.objectId);
+        if (session) this.leaveSession(session, id, byId, scene);
+        else held.delete(m.grab.objectId);
+      }
       this.memory.delete(id);
     }
 
@@ -122,6 +185,9 @@ export class HandInteractionEngine {
         this.memory.set(input.id, m);
       }
 
+      // Members of a two-hand grab are handled together below.
+      if (m.grab && this.sessions.has(m.grab.objectId)) continue;
+
       if (input.status === 'lost') {
         pointers.push(this.pointer(input, 'lost', null, m));
         continue;
@@ -137,27 +203,7 @@ export class HandInteractionEngine {
           pointers.push(this.pointer(input, hoverId ? 'hovering' : 'tracking', hoverId, m));
           continue;
         }
-        // Fingers opening (still pinched, past the start threshold): hold the
-        // object still so letting go never drags it.
-        const hit = input.pinch.releasing
-          ? null
-          : scene.planePoint(input.screen, m.grab.planeOrigin);
-        if (hit) {
-          const next: Vec3 = [
-            hit[0] + m.grab.offset[0],
-            hit[1] + m.grab.offset[1],
-            hit[2] + m.grab.offset[2],
-          ];
-          const moved = Math.hypot(
-            next[0] - m.grab.last[0],
-            next[1] - m.grab.last[1],
-            next[2] - m.grab.last[2],
-          );
-          if (moved > MOVE_EPSILON) {
-            commands.push({ type: 'setPosition', id: m.grab.objectId, position: next });
-            m.grab.last = next;
-          }
-        }
+        this.moveOneHand(input, m.grab, scene, commands);
         pointers.push(this.pointer(input, 'grabbing', null, m));
         continue;
       }
@@ -171,6 +217,41 @@ export class HandInteractionEngine {
       }
 
       if (input.pinch.started) {
+        // Joining an object another hand holds alone?
+        const joinId = this.joinTarget(input, hoverId, held, scene, blocked);
+        if (joinId !== null) {
+          const holderId = held.get(joinId)!;
+          const ids: [number, number] =
+            holderId < input.id ? [holderId, input.id] : [input.id, holderId];
+          const pose = this.currentPose(joinId, this.memory.get(holderId)!.grab!, scene);
+          m.grab = this.anchor(joinId, pose.position, input, scene);
+          const session: TwoHandSession = {
+            objectId: joinId,
+            ids,
+            grip: null,
+            driver: 'none',
+            paused: false,
+            pose,
+            info: {
+              objectId: joinId,
+              pointerIds: ids,
+              mode: 'frozen',
+              lostId: null,
+              scaleFactor: 1,
+              roll: 0,
+              scale: pose.scale,
+              atLimit: false,
+              holding: false,
+            },
+          };
+          this.sessions.set(joinId, session);
+          // The holder may already be in `pointers` this frame: drop its entry,
+          // the session emits both.
+          const i = pointers.findIndex((p) => p.id === holderId);
+          if (i !== -1) pointers.splice(i, 1);
+          continue;
+        }
+
         const target = hoverId && !held.has(hoverId) && !blocked(hoverId) ? hoverId : null;
         const origin = target ? scene.objectPosition(target) : null;
         const hit = origin ? scene.planePoint(input.screen, origin) : null;
@@ -194,12 +275,224 @@ export class HandInteractionEngine {
       pointers.push(this.pointer(input, hoverId ? 'hovering' : 'tracking', hoverId, m));
     }
 
-    return { pointers, commands, held, grabbing: held.size > 0 };
+    for (const session of [...this.sessions.values()]) {
+      this.updateSession(now, session, byId, scene, commands, pointers, held);
+    }
+
+    return {
+      pointers,
+      commands,
+      held,
+      grabbing: held.size > 0,
+      twoHand: [...this.sessions.values()].map((s) => s.info),
+    };
   }
 
   /** Release everything (e.g. camera turned off). */
   reset() {
     this.memory.clear();
+    this.sessions.clear();
+  }
+
+  private joinTarget(
+    input: PointerInput,
+    hoverId: string | null,
+    held: Map<string, number>,
+    scene: SceneQuery,
+    blocked: (id: string) => boolean,
+  ): string | null {
+    if (!input.inBox) return null;
+    const ok = (id: string) =>
+      held.has(id) && held.get(id) !== input.id && !this.sessions.has(id) && !blocked(id);
+    if (hoverId && ok(hoverId)) return hoverId;
+    if (hoverId || !scene.near) return null;
+    for (const id of held.keys()) if (ok(id) && scene.near(input.screen, id, JOIN_SLACK)) return id;
+    return null;
+  }
+
+  /** The object's pose right now, from what this engine last commanded. */
+  private currentPose(id: string, grab: GrabState, scene: SceneQuery): Pose {
+    const known = scene.objectPose?.(id);
+    return {
+      position: clampPosition(grab.last),
+      rotation: known ? [...known.rotation] : [0, 0, 0, 1],
+      scale: known?.scale ?? 1,
+    };
+  }
+
+  /** A one-hand grab of `id` at `position`, keeping the object where it is. */
+  private anchor(id: string, position: Vec3, input: PointerInput, scene: SceneQuery): GrabState {
+    const hit = scene.planePoint(input.screen, position);
+    return {
+      objectId: id,
+      planeOrigin: [...position],
+      offset: hit ? [position[0] - hit[0], position[1] - hit[1], position[2] - hit[2]] : [0, 0, 0],
+      last: [...position],
+    };
+  }
+
+  private moveOneHand(
+    input: PointerInput,
+    grab: GrabState,
+    scene: SceneQuery,
+    commands: Command[],
+  ) {
+    // Fingers opening (still pinched, past the start threshold): hold the
+    // object still so letting go never drags it.
+    const hit = input.pinch.releasing ? null : scene.planePoint(input.screen, grab.planeOrigin);
+    if (!hit) return;
+    const next: Vec3 = [hit[0] + grab.offset[0], hit[1] + grab.offset[1], hit[2] + grab.offset[2]];
+    const moved = Math.hypot(
+      next[0] - grab.last[0],
+      next[1] - grab.last[1],
+      next[2] - grab.last[2],
+    );
+    if (moved > MOVE_EPSILON) {
+      commands.push({ type: 'setPosition', id: grab.objectId, position: next });
+      grab.last = next;
+    }
+  }
+
+  /** Remove `leaving` from a two-hand grab; the other hand keeps it, re-anchored. */
+  private leaveSession(
+    session: TwoHandSession,
+    leaving: number,
+    byId: Map<number, PointerInput>,
+    scene: SceneQuery,
+  ) {
+    this.sessions.delete(session.objectId);
+    const otherId = session.ids[0] === leaving ? session.ids[1] : session.ids[0];
+    const other = this.memory.get(otherId);
+    const input = byId.get(otherId);
+    if (other?.grab) {
+      other.grab = input
+        ? this.anchor(session.objectId, session.pose.position, input, scene)
+        : { ...other.grab, last: [...session.pose.position] };
+    }
+  }
+
+  private updateSession(
+    now: number,
+    s: TwoHandSession,
+    byId: Map<number, PointerInput>,
+    scene: SceneQuery,
+    commands: Command[],
+    pointers: HandPointer[],
+    held: Map<string, number>,
+  ) {
+    const [ia, ib] = s.ids;
+    const a = byId.get(ia);
+    const b = byId.get(ib);
+    const ma = this.memory.get(ia);
+    const mb = this.memory.get(ib);
+    if (!a || !b || !ma?.grab || !mb?.grab) {
+      // A member vanished earlier this frame; leaveSession already ran.
+      this.sessions.delete(s.objectId);
+      return;
+    }
+
+    // A tracked hand whose pinch ended lets go and leaves the grab.
+    const letGo = (p: PointerInput) =>
+      p.status === 'tracking' && (p.pinch.ended || !p.pinch.active);
+    const aGone = letGo(a);
+    const bGone = letGo(b);
+    if (aGone || bGone) {
+      this.sessions.delete(s.objectId);
+      for (const [p, m, gone] of [
+        [a, ma, aGone],
+        [b, mb, bGone],
+      ] as const) {
+        if (gone) {
+          m.grab = null;
+          m.releasedAt = now;
+          const hoverId = p.inBox ? scene.pick(p.screen) : null;
+          pointers.push(this.pointer(p, hoverId ? 'hovering' : 'tracking', hoverId, m));
+        } else {
+          m.grab =
+            p.status === 'tracking'
+              ? this.anchor(s.objectId, s.pose.position, p, scene)
+              : { ...m.grab!, last: [...s.pose.position] };
+          held.set(s.objectId, p.id);
+          pointers.push(this.pointer(p, p.status === 'lost' ? 'lost' : 'grabbing', null, m));
+        }
+      }
+      if (aGone && bGone) held.delete(s.objectId);
+      return;
+    }
+
+    const aOn = a.status === 'tracking';
+    const bOn = b.status === 'tracking';
+    const driver: TwoHandSession['driver'] = aOn && bOn ? 'two' : aOn ? ia : bOn ? ib : 'none';
+    const paused = driver === 'two' && !!(a.pinch.releasing || b.pinch.releasing);
+    const rebase = driver !== s.driver || (s.paused && !paused);
+
+    if (driver === 'two') {
+      const view = scene.view?.() ?? DEFAULT_VIEW;
+      const origin = s.pose.position;
+      const ga = scene.planePoint(a.screen, origin);
+      const gb = scene.planePoint(b.screen, origin);
+      if (ga && gb) {
+        if (rebase || !s.grip) {
+          if (s.grip) s.grip.rebase(s.pose, ga, gb, now);
+          else s.grip = new BimanualGrip(s.pose, ga, gb, view, now);
+        }
+        if (!paused) {
+          const r = s.grip.update(ga, gb, now);
+          const position = clampPosition(r.position);
+          const moved =
+            Math.hypot(
+              position[0] - s.pose.position[0],
+              position[1] - s.pose.position[1],
+              position[2] - s.pose.position[2],
+            ) > MOVE_EPSILON ||
+            Math.abs(r.scale - s.pose.scale) > 1e-6 ||
+            r.rotation.some((v, i) => Math.abs(v - s.pose.rotation[i]!) > 1e-7);
+          if (moved) {
+            s.pose = { position, rotation: r.rotation, scale: r.scale };
+            commands.push({
+              type: 'setTransform',
+              id: s.objectId,
+              position,
+              rotation: r.rotation,
+              scale: r.scale,
+            });
+          }
+          s.info = {
+            ...s.info,
+            scaleFactor: r.scaleFactor,
+            roll: r.roll,
+            scale: r.scale,
+            atLimit: r.atLimit,
+            holding: r.holding,
+          };
+        }
+      }
+    } else if (driver !== 'none') {
+      const p = driver === ia ? a : b;
+      const m = driver === ia ? ma : mb;
+      if (rebase) m.grab = this.anchor(s.objectId, s.pose.position, p, scene);
+      this.moveOneHand(p, m.grab!, scene, commands);
+      s.pose = { ...s.pose, position: clampPosition(m.grab!.last) };
+    }
+
+    // Keep both members' grab state pointing at the latest pose, so whichever
+    // hand ends up alone re-anchors from the right place.
+    ma.grab.last = [...s.pose.position];
+    mb.grab.last = [...s.pose.position];
+    s.driver = driver;
+    s.paused = paused;
+    s.info = {
+      ...s.info,
+      mode: driver === 'two' ? 'two' : driver === 'none' ? 'frozen' : 'one',
+      lostId: !aOn ? ia : !bOn ? ib : null,
+    };
+    held.set(s.objectId, ia);
+    for (const [p, m] of [
+      [a, ma],
+      [b, mb],
+    ] as const) {
+      pointers.push(this.pointer(p, p.status === 'lost' ? 'lost' : 'grabbing', null, m));
+    }
   }
 
   private pointer(
