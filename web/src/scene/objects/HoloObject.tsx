@@ -121,12 +121,12 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
     const handHeld = handRuntime.held.has(object.id);
     if (instant) {
       g.position.set(px, py, pz);
-      g.rotation.set(...object.rotation);
+      g.quaternion.set(...object.rotation);
       g.scale.setScalar(object.scale);
     } else {
       // Hands already arrive smoothed; keep the object tight to the hand cursor.
       easing.damp3(g.position, object.position, handHeld ? 0.03 : 0.08, delta);
-      easing.dampE(g.rotation, object.rotation, 0.1, delta);
+      easing.dampQ(g.quaternion, object.rotation, 0.1, delta);
       easing.damp3(g.scale, [object.scale, object.scale, object.scale], 0.1, delta);
     }
 

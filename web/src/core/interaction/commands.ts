@@ -3,6 +3,8 @@
  * (M2+) and replayed recordings all produce the same commands, so every input
  * path shares one tested reducer.
  */
+import type { Quat } from '@/core/math/quat';
+
 export type Vec3 = [number, number, number];
 
 export type ObjectKind = 'sphere' | 'cube' | 'sculpture';
@@ -14,7 +16,10 @@ export type Command =
   | { type: 'cycleSelection'; direction: 1 | -1 }
   | { type: 'setPosition'; id: string; position: Vec3 }
   | { type: 'translate'; id: string; delta: Vec3 }
+  /** Turn by Euler XYZ angles (radians) about the world axes. */
   | { type: 'rotate'; id: string; delta: Vec3 }
+  /** Absolute pose, e.g. from a two-hand grab. Omitted parts stay as they are. */
+  | { type: 'setTransform'; id: string; position?: Vec3; rotation?: Quat; scale?: number }
   | { type: 'scaleBy'; id: string; factor: number }
   | { type: 'add'; kind: ObjectKind }
   | { type: 'remove'; id: string }
@@ -24,8 +29,8 @@ export interface SceneObject {
   id: string;
   kind: ObjectKind;
   position: Vec3;
-  /** Euler XYZ, radians. */
-  rotation: Vec3;
+  /** Unit quaternion [x, y, z, w]. */
+  rotation: Quat;
   scale: number;
 }
 
