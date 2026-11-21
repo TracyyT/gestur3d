@@ -14,7 +14,7 @@ import type { InputSource, SceneObject, Vec3 } from '@/core/interaction/commands
 import { handRuntime } from '@/features/hands/handRuntime';
 import { createHoloMaterial } from '@/scene/materials/holoMaterial';
 import { objectRegistry } from '@/scene/objectRegistry';
-import { KINDS, kindGeometry } from './kinds';
+import { COLOR_STYLE, KINDS, kindGeometry } from './kinds';
 import { FLOOR_Y } from '@/scene/constants';
 import { useScene } from '@/stores/scene';
 import { palette } from '@/ui/theme';
@@ -57,15 +57,16 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
 
   const kind = KINDS[object.kind];
   const { body: kindBody, edges } = kindGeometry(object.kind);
+  const style = object.color ? COLOR_STYLE[object.color] : kind;
   const material = useMemo(
     () =>
       createHoloMaterial({
-        color: kind.color,
-        rimColor: kind.rim,
+        color: style.color,
+        rimColor: style.rim,
         opacity: kind.opacity,
         scanDensity: 4,
       }),
-    [kind],
+    [style, kind.opacity],
   );
   const ringColor = useMemo(() => new Color(palette.cyan).multiplyScalar(1.4), []);
 
@@ -224,7 +225,7 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
           {edges && (
             <lineSegments geometry={edges} raycast={() => null}>
               <lineBasicMaterial
-                color={kind.color}
+                color={style.color}
                 transparent
                 opacity={selected ? 0.55 : 0.22}
                 blending={AdditiveBlending}

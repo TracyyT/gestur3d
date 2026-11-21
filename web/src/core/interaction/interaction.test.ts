@@ -194,3 +194,16 @@ describe('spawnPosition', () => {
     expect(p.every(Number.isFinite)).toBe(true);
   });
 });
+
+describe('setColor', () => {
+  it('sets, changes and clears an object color', () => {
+    let m = createInitialScene();
+    m = applyCommand(m, { type: 'setColor', id: 'obj-1', color: 'white' });
+    expect(m.objects[0]!.color).toBe('white');
+    const same = applyCommand(m, { type: 'setColor', id: 'obj-1', color: 'white' });
+    expect(same).toBe(m);
+    m = applyCommand(m, { type: 'setColor', id: 'obj-1', color: null });
+    expect('color' in m.objects[0]!).toBe(false);
+    expect(applyCommand(m, { type: 'setColor', id: 'nope', color: 'cyan' })).toBe(m);
+  });
+});
