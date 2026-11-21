@@ -3,22 +3,18 @@ import { easing } from 'maath';
 import { useEffect, useMemo, useRef } from 'react';
 import {
   AdditiveBlending,
-  BoxGeometry,
   Color,
-  EdgesGeometry,
-  IcosahedronGeometry,
   Plane,
-  TorusKnotGeometry,
   Vector3,
-  type BufferGeometry,
   type Group,
   type Mesh,
   type ShaderMaterial,
 } from 'three';
-import type { InputSource, ObjectKind, SceneObject, Vec3 } from '@/core/interaction/commands';
+import type { InputSource, SceneObject, Vec3 } from '@/core/interaction/commands';
 import { handRuntime } from '@/features/hands/handRuntime';
 import { createHoloMaterial } from '@/scene/materials/holoMaterial';
 import { objectRegistry } from '@/scene/objectRegistry';
+import { KINDS, kindGeometry } from './kinds';
 import { FLOOR_Y } from '@/scene/constants';
 import { useScene } from '@/stores/scene';
 import { palette } from '@/ui/theme';
@@ -29,32 +25,6 @@ interface Props {
   /** Snap transforms instead of easing (reduced motion). */
   instant: boolean;
   onHoverChange: (id: string, hovering: boolean) => void;
-}
-
-const STYLE: Record<ObjectKind, { color: string; rim: string }> = {
-  sphere: { color: palette.cyan, rim: palette.violet },
-  cube: { color: palette.violet, rim: palette.cyan },
-  sculpture: { color: palette.cyanDeep, rim: palette.cyan },
-};
-
-function useKindGeometry(kind: ObjectKind) {
-  return useMemo(() => {
-    switch (kind) {
-      case 'sphere':
-        return {
-          body: new IcosahedronGeometry(0.62, 4) as BufferGeometry,
-          edges: new EdgesGeometry(new IcosahedronGeometry(0.63, 1)) as BufferGeometry | null,
-        };
-      case 'cube':
-        return {
-          body: new BoxGeometry(0.95, 0.95, 0.95),
-          edges: new EdgesGeometry(new BoxGeometry(0.96, 0.96, 0.96)),
-        };
-      case 'sculpture':
-        // Too dense for edge lines; the holo shell carries it alone.
-        return { body: new TorusKnotGeometry(0.42, 0.13, 200, 24), edges: null };
-    }
-  }, [kind]);
 }
 
 const tmpHit = new Vector3();
@@ -83,26 +53,22 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
   const dispatch = useScene((s) => s.dispatch);
   const setMode = useScene((s) => s.setMode);
 
-  const { body: kindBody, edges } = useKindGeometry(object.kind);
-  const material = useMemo(() => {
-    const s = STYLE[object.kind];
-    return createHoloMaterial({
-      color: s.color,
-      rimColor: s.rim,
-      opacity: object.kind === 'cube' ? 0.65 : 0.9,
-      scanDensity: 4,
-    });
-  }, [object.kind]);
+  const kind = KINDS[object.kind];
+  const { body: kindBody, edges } = kindGeometry(object.kind);
+  const material = useMemo(
+    () =>
+      createHoloMaterial({
+        color: kind.color,
+        rimColor: kind.rim,
+        opacity: kind.opacity,
+        scanDensity: 4,
+      }),
+    [kind],
+  );
   const ringColor = useMemo(() => new Color(palette.cyan).multiplyScalar(1.4), []);
 
-  useEffect(
-    () => () => {
-      material.dispose();
-      kindBody.dispose();
-      edges?.dispose();
-    },
-    [material, kindBody, edges],
-  );
+  // Geometry is shared per kind (see kinds.ts); only the material is ours.
+  useEffect(() => () => material.dispose(), [material]);
 
   // Register the pickable mesh so hands can raycast against it.
   useEffect(() => {
@@ -250,7 +216,7 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
         {edges && (
           <lineSegments geometry={edges} raycast={() => null}>
             <lineBasicMaterial
-              color={STYLE[object.kind].color}
+              color={kind.color}
               transparent
               opacity={selected ? 0.55 : 0.22}
               blending={AdditiveBlending}
