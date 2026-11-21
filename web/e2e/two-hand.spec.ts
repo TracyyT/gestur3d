@@ -182,6 +182,39 @@ test.describe('two-hand grab', () => {
     });
   }
 
+  test('the second hand can join from empty space, away from the object', async ({ page }) => {
+    await open(page, 1440, 900, true);
+    const c = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
+    const at = await px(page);
+    // Right grabs the cube; left pinches on empty floor below-left of it (no
+    // object there), then moves further out (separation 311 → 439 px, ~1.41×).
+    const right: HandKey[] = [
+      { at: 0, ...at(20, 0, c), pinch: 0 },
+      { at: 400, ...at(20, 0, c), pinch: 0 },
+      { at: 550, ...at(20, 0, c), pinch: 1 },
+      { at: 2600, ...at(20, 0, c), pinch: 1 },
+      { at: 2750, ...at(20, 0, c), pinch: 0 },
+      { at: 3100, ...at(20, 0, c), pinch: 0 },
+    ];
+    const left: HandKey[] = [
+      { at: 0, ...at(-200, 220, c), pinch: 0 },
+      { at: 900, ...at(-200, 220, c), pinch: 0 },
+      { at: 1050, ...at(-200, 220, c), pinch: 1 },
+      { at: 1400, ...at(-200, 220, c), pinch: 1 },
+      { at: 2000, ...at(-300, 320, c), pinch: 1 },
+      { at: 2600, ...at(-300, 320, c), pinch: 1 },
+      { at: 2750, ...at(-300, 320, c), pinch: 0 },
+      { at: 3100, ...at(-300, 320, c), pinch: 0 },
+    ];
+    const before = await cube(page);
+    const samples = await playSampled(page, right, left);
+    expect(samples.some((s) => s.two === 1)).toBe(true);
+    expect(maxDrift(samples, 800, 1350)).toBeLessThanOrEqual(1);
+    const after = await cube(page);
+    expect(after.scale / before.scale).toBeGreaterThan(1.3);
+    expect(after.scale / before.scale).toBeLessThan(1.47);
+  });
+
   test('spreading far past the limit stops at 3× and flags the limit', async ({ page }) => {
     await open(page, 1440, 900, true);
     const c = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;

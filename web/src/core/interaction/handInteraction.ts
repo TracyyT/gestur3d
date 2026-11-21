@@ -47,8 +47,6 @@ export interface SceneQuery {
   objectPosition(id: string): Vec3 | null;
   /** Full pose; defaults to the position with no rotation and scale 1. */
   objectPose?(id: string): Pose | null;
-  /** True if `screen` is within `slack` × the object's on-screen radius of its center. */
-  near?(screen: ScreenPos, id: string, slack: number): boolean;
   /** Camera axes in world space; defaults to +X right, +Y up. */
   view?(): ViewBasis;
 }
@@ -114,8 +112,6 @@ interface TwoHandSession {
 }
 
 const MOVE_EPSILON = 1e-4;
-/** A second hand joins if it pinches within this × the held object's on-screen radius. */
-export const JOIN_SLACK = 1.3;
 const DEFAULT_VIEW: ViewBasis = { right: [1, 0, 0], up: [0, 1, 0] };
 
 /**
@@ -134,8 +130,8 @@ const DEFAULT_VIEW: ViewBasis = { right: [1, 0, 0], up: [0, 1, 0] };
  *   expires, the object is released where it is.
  *
  * Two hands:
- * - A second hand that starts a pinch on (or next to) an object held by one
- *   hand joins the grab. Both hands then move, scale and roll it
+ * - A second hand that starts a pinch on an object held by one hand, or on
+ *   empty space, joins the grab. Both hands then move, scale and roll it
  *   (`BimanualGrip`).
  * - Whenever the set of hands driving the object changes (join, release, a hand
  *   lost or back), the drivers re-anchor on the object's current pose, so it
@@ -218,7 +214,7 @@ export class HandInteractionEngine {
 
       if (input.pinch.started) {
         // Joining an object another hand holds alone?
-        const joinId = this.joinTarget(input, hoverId, held, scene, blocked);
+        const joinId = this.joinTarget(input, hoverId, held, blocked);
         if (joinId !== null) {
           const holderId = held.get(joinId)!;
           const ids: [number, number] =
@@ -294,20 +290,24 @@ export class HandInteractionEngine {
     this.sessions.clear();
   }
 
+  /**
+   * The object this hand's new pinch should join, if any. Pinching on an
+   * object held by the other hand alone joins it; so does pinching on empty
+   * space, so a small object doesn't need both hands on it. Pinching on a
+   * different, free object grabs that one instead (returns null).
+   */
   private joinTarget(
     input: PointerInput,
     hoverId: string | null,
     held: Map<string, number>,
-    scene: SceneQuery,
     blocked: (id: string) => boolean,
   ): string | null {
     if (!input.inBox) return null;
     const ok = (id: string) =>
       held.has(id) && held.get(id) !== input.id && !this.sessions.has(id) && !blocked(id);
-    if (hoverId && ok(hoverId)) return hoverId;
-    if (hoverId || !scene.near) return null;
-    for (const id of held.keys()) if (ok(id) && scene.near(input.screen, id, JOIN_SLACK)) return id;
-    return null;
+    if (hoverId) return ok(hoverId) ? hoverId : null;
+    const candidates = [...held.keys()].filter(ok);
+    return candidates.length === 1 ? candidates[0]! : null;
   }
 
   /** The object's pose right now, from what this engine last commanded. */
