@@ -291,10 +291,12 @@ test.describe('two-hand grab', () => {
     // Hands still from 2.0 s to 2.95 s, across the release.
     expect(maxDrift(samples, 2000, 2950)).toBeLessThanOrEqual(1);
     // Then the right hand carried it 120 px down.
-    const held = samples.filter((s) => s.t >= 2800 && s.t <= 2950).at(-1)!;
+    // Last sample before the right hand starts moving (slow CI renders few frames).
+    const held = samples.filter((s) => s.t >= 2000 && s.t <= 2990).at(-1);
+    expect(held, 'a sample while the right hand held still').toBeTruthy();
     const last = samples.at(-1)!;
-    expect(Math.abs(last.x - held.x)).toBeLessThan(4);
-    expect(Math.abs(last.y - held.y - 120)).toBeLessThan(4);
+    expect(Math.abs(last.x - held!.x)).toBeLessThan(4);
+    expect(Math.abs(last.y - held!.y - 120)).toBeLessThan(4);
   });
 
   test('one hand dropping out briefly or for longer never jumps the cube', async ({ page }) => {
