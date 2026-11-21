@@ -71,10 +71,55 @@ function update(model: SceneModel, id: string, fn: (o: SceneObject) => SceneObje
   return changed ? { ...model, objects } : model;
 }
 
-/** Spawn point for new objects: front and center, nudged so they don't stack exactly. */
-function spawnPosition(model: SceneModel): Vec3 {
-  const n = model.objects.length;
-  return clampPosition([((n % 5) - 2) * 0.35, 0.5 + (n % 3) * 0.2, 0.6]);
+/** Rough radius of an object at scale 1, for spacing new objects. */
+const OBJECT_RADIUS = 0.7;
+
+/**
+ * Candidate spawn points, best first: a row above the default objects, then
+ * low in front of the gaps between them, then out to the left, then behind. Kept left of
+ * x ≈ 2.4 on the right, where the side panels start covering the scene.
+ */
+const SPAWN_CANDIDATES: Vec3[] = [
+  [0, 1.75, -0.6],
+  [-1.75, 1.75, -0.6],
+  [1.75, 1.75, -0.6],
+  [-0.95, -0.35, 2.3],
+  [0.95, -0.35, 2.3],
+  [-3.3, 1.75, -0.6],
+  [-2.85, -0.35, 2.3],
+  [-3.7, 0.25, -0.6],
+  [0, 0.25, -3],
+  [-2.1, 0.25, -3],
+  [2.1, 0.25, -3],
+  [0, 2.9, -3],
+];
+
+/**
+ * Spawn point for a new object: the first candidate with room around it, so
+ * new objects don't land inside existing ones. If the scene is crowded, the
+ * candidate farthest from everything.
+ */
+export function spawnPosition(model: SceneModel): Vec3 {
+  const clearance = (p: Vec3) =>
+    Math.min(
+      Infinity,
+      ...model.objects.map(
+        (o) =>
+          Math.hypot(p[0] - o.position[0], p[1] - o.position[1], p[2] - o.position[2]) -
+          OBJECT_RADIUS * (1 + o.scale),
+      ),
+    );
+  let best = SPAWN_CANDIDATES[0]!;
+  let bestClear = -Infinity;
+  for (const p of SPAWN_CANDIDATES) {
+    const c = clearance(p);
+    if (c >= 0) return clampPosition(p);
+    if (c > bestClear) {
+      bestClear = c;
+      best = p;
+    }
+  }
+  return clampPosition(best);
 }
 
 /** Pure scene reducer. Returns the same object when nothing changed. */
