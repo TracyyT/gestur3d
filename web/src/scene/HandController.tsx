@@ -90,7 +90,6 @@ export function HandController() {
     const now = performance.now();
     const { size } = state;
     const settings = useSettings.getState();
-    engine.configure({ depth: settings.twoHandDepth });
     const key = `${settings.trackingSmoothing}|${settings.gestureSensitivity}`;
     if (key !== config.current) {
       tracker.configure({

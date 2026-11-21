@@ -26,8 +26,6 @@ export interface SettingsState {
    * back to the main thread.
    */
   trackingBackend: TrackingBackendPreference;
-  /** Two hands pushed toward / pulled from the camera move the held object in depth. */
-  twoHandDepth: boolean;
   /** An open palm held still opens the radial menu. */
   palmMenu: boolean;
 }
@@ -48,7 +46,6 @@ export const DEFAULT_SETTINGS: SettingsState = {
   showDebugOverlay: false,
   preferredCameraId: null,
   trackingBackend: 'main-thread',
-  twoHandDepth: false,
   palmMenu: true,
 };
 
