@@ -53,6 +53,8 @@ export interface TrackSnapshot {
   tip: [number, number];
   /** Smoothed apparent palm size (see `palmSize`); larger = closer to the camera. */
   palm: number;
+  /** World landmarks from the latest detection (for pose rules like the open palm). */
+  world: ArrayLike<number> | null;
   pinch: PinchState;
   /** Timestamp (ms) of the last detection that included this hand. */
   lastSeen: number;
@@ -89,6 +91,7 @@ interface Track {
   rawAnchor: [number, number];
   tip: [number, number];
   palm: number;
+  world: ArrayLike<number> | null;
   pinch: PinchState;
   lastSeen: number;
   lostSince: number | null;
@@ -213,6 +216,7 @@ export class HandTracker {
       rawAnchor: t.rawAnchor,
       tip: t.tip,
       palm: t.palm,
+      world: t.world,
       pinch: t.pinch,
       lastSeen: t.lastSeen,
       lostSince: t.lostSince,
@@ -236,6 +240,7 @@ export class HandTracker {
       rawAnchor: [0, 0],
       tip: [0, 0],
       palm: 0,
+      world: null,
       pinch: NO_PINCH,
       lastSeen: 0,
       lostSince: null,
@@ -256,6 +261,7 @@ export class HandTracker {
     track.rawAnchor = raw;
     const [tx, ty] = track.tipFilter.filter(anchorPoint(hand.image, 'pinch'), now);
     track.tip = [tx!, ty!];
+    track.world = hand.world;
     track.palm = track.palmFilter.filter([palmSize(hand.image, aspect)], now)[0]!;
     track.pinch = track.pinchDetector.update(pinchRatio(hand.world, hand.image, aspect), now);
     track.lastSeen = now;

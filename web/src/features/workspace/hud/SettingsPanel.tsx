@@ -48,6 +48,12 @@ export function SettingsPanel() {
             checked={s.twoHandDepth}
             onChange={(v) => s.set('twoHandDepth', v)}
           />
+          <Toggle
+            label="Open-palm menu"
+            hint="Hold an open hand, fingers spread, toward the camera to open the menu."
+            checked={s.palmMenu}
+            onChange={(v) => s.set('palmMenu', v)}
+          />
         </section>
 
         <section className="space-y-4 border-t border-line pt-4" aria-label="Visuals">

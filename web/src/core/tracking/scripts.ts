@@ -18,6 +18,8 @@ export interface Keyframe {
   visible?: boolean;
   /** Hand size at this keyframe (overrides the script's); bigger = closer to the camera. */
   size?: number;
+  /** Finger spread in degrees (see synthHand). */
+  spread?: number;
 }
 
 export interface ScriptOptions {
@@ -54,6 +56,7 @@ export function scriptedRecording(keys: Keyframe[], opts: ScriptOptions = {}): R
         cy: a.cy + (b.cy - a.cy) * k,
         pinch: a.pinch + (b.pinch - a.pinch) * k,
         size: (a.size ?? size) + ((b.size ?? size) - (a.size ?? size)) * k,
+        spread: (a.spread ?? 0) + ((b.spread ?? 0) - (a.spread ?? 0)) * k,
         handedness,
         aspect,
       });

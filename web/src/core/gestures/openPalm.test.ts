@@ -74,6 +74,13 @@ describe('isOpenPalm', () => {
     expect(isOpenPalm(tucked)).toBe(false);
   });
 
+  it('accepts synthetic hands with spread fingers (either hand) and not relaxed ones', () => {
+    for (const handedness of ['Right', 'Left'] as const) {
+      expect(isOpenPalm(synthHand({ cx: 0.5, cy: 0.6, handedness, spread: 45 }).world)).toBe(true);
+      expect(isOpenPalm(synthHand({ cx: 0.5, cy: 0.6, handedness }).world)).toBe(false);
+    }
+  });
+
   it('rejects degenerate input', () => {
     expect(isOpenPalm(new Float32Array(63))).toBe(false);
   });
