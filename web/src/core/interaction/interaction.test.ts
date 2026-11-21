@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Vec3 } from './commands';
 import { quatFromAxisAngle, quatRotateVec3 } from '@/core/math/quat';
 import type { KeyInput } from './keyboard';
 import { keyToCommand, MOVE_STEP } from './keyboard';
@@ -10,6 +11,7 @@ import {
   objectLabel,
   SCALE_MAX,
   SCALE_MIN,
+  spawnPosition,
 } from './sceneModel';
 
 const key = (k: string, mods: Partial<KeyInput> = {}): KeyInput => ({
@@ -162,5 +164,33 @@ describe('keyToCommand', () => {
 
   it('leaves browser shortcuts alone', () => {
     expect(keyToCommand(key('e', { metaKey: true }), 'a')).toBeNull();
+  });
+});
+
+describe('spawnPosition', () => {
+  const gap = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+  it('puts new objects where they do not overlap existing ones', () => {
+    let m = createInitialScene();
+    for (let i = 0; i < 6; i++) m = applyCommand(m, { type: 'add', kind: 'cube' });
+    for (let i = 0; i < m.objects.length; i++)
+      for (let j = i + 1; j < m.objects.length; j++)
+        expect(gap(m.objects[i]!.position, m.objects[j]!.position)).toBeGreaterThan(1.3);
+  });
+
+  it('gives bigger objects more room', () => {
+    let m = createInitialScene();
+    m = applyCommand(m, { type: 'scaleBy', id: 'obj-2', factor: 3 });
+    const p = spawnPosition(m);
+    const cube = m.objects.find((o) => o.id === 'obj-2')!;
+    expect(gap(p, cube.position)).toBeGreaterThan(0.7 * 4);
+  });
+
+  it('still finds a spot inside the bounds when the scene is crowded', () => {
+    let m = createInitialScene();
+    for (let i = 0; i < 40; i++) m = applyCommand(m, { type: 'add', kind: 'sphere' });
+    const p = spawnPosition(m);
+    expect(Math.abs(p[0])).toBeLessThanOrEqual(BOUNDS.x);
+    expect(p.every(Number.isFinite)).toBe(true);
   });
 });
