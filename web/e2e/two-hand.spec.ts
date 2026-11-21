@@ -431,21 +431,24 @@ test.describe('two-hand grab', () => {
       await open(page, 1440, 900, true, depth ? { twoHandDepth: true } : {});
       const c = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
       const at = await px(page);
+      // A real push toward the camera makes the hands look 25% bigger AND 25%
+      // farther apart (perspective), around the same midpoint.
       const R = at(20, 0, c);
       const L = at(-100, 120, c);
-      // Both hands grow 25% (toward the camera) from 1.4 s to 2.2 s, cursors still.
-      const keys = (p: UV, joinAt: number): HandKey[] => [
+      const R2 = at(35, -15, c);
+      const L2 = at(-115, 135, c);
+      const keys = (p: UV, p2: UV, joinAt: number): HandKey[] => [
         { at: 0, ...p, pinch: 0 },
         { at: joinAt, ...p, pinch: 0 },
         { at: joinAt + 150, ...p, pinch: 1 },
         { at: 1400, ...p, pinch: 1, size: 0.12 },
-        { at: 2200, ...p, pinch: 1, size: 0.15 },
-        { at: 2800, ...p, pinch: 1, size: 0.15 },
-        { at: 2950, ...p, pinch: 0, size: 0.15 },
-        { at: 3300, ...p, pinch: 0, size: 0.15 },
+        { at: 2200, ...p2, pinch: 1, size: 0.15 },
+        { at: 2800, ...p2, pinch: 1, size: 0.15 },
+        { at: 2950, ...p2, pinch: 0, size: 0.15 },
+        { at: 3300, ...p2, pinch: 0, size: 0.15 },
       ];
       const before = await cube(page);
-      const samples = await playSampled(page, keys(R, 400), keys(L, 900));
+      const samples = await playSampled(page, keys(R, R2, 400), keys(L, L2, 900));
       expect(samples.some((s) => s.two === 1)).toBe(true);
       const after = await cube(page);
       const dz = after.position[2] - before.position[2];
@@ -453,8 +456,12 @@ test.describe('two-hand grab', () => {
         // 3 × (ln 1.25 − 0.04) ≈ 0.55 toward the camera (+z), give or take smoothing.
         expect(dz).toBeGreaterThan(0.4);
         expect(dz).toBeLessThan(0.65);
+        // ...without growing: the spread is measured in palm widths.
+        expect(Math.abs(after.scale / before.scale - 1)).toBeLessThan(0.04);
       } else {
         expect(Math.abs(dz)).toBeLessThan(1e-6);
+        // With depth off, the wider on-screen spread scales it instead.
+        expect(after.scale / before.scale).toBeGreaterThan(1.15);
       }
     });
   }

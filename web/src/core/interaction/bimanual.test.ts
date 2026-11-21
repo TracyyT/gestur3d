@@ -260,6 +260,29 @@ describe('BimanualGrip', () => {
     expect(g2.update(L, R, 33, undefined, [0.103, 0.103]).depth).toBe(0);
   });
 
+  it('with depth on, pushing both hands forward moves the object without growing it', () => {
+    const opts = {
+      ...EXACT,
+      depthGain: 3,
+      depthDeadZone: 0,
+      depthFilter: { minCutoff: 1e9, beta: 0, dCutoff: 1 },
+    };
+    const g = new BimanualGrip(START, L, R, VIEW, 0, opts, undefined, [0.1, 0.1]);
+    // Hands 25% closer: palms and the on-screen spread both grow 25%.
+    const r = g.update([-1.25, 0, 0], [1.25, 0, 0], 33, undefined, [0.125, 0.125]);
+    expect(r.scale).toBeCloseTo(1);
+    expect(r.depth).toBeCloseTo(3 * Math.log(1.25));
+    // Spreading the hands at the same distance still scales.
+    const s = g.update([-2.5, 0, 0], [2.5, 0, 0], 66, undefined, [0.125, 0.125]);
+    expect(s.scale).toBeCloseTo(2);
+  });
+
+  it('with depth off, the on-screen spread alone sets the scale', () => {
+    const g = new BimanualGrip(START, L, R, VIEW, 0, EXACT, undefined, [0.1, 0.1]);
+    const r = g.update([-1.25, 0, 0], [1.25, 0, 0], 33, undefined, [0.125, 0.125]);
+    expect(r.scale).toBeCloseTo(1.25);
+  });
+
   it('rebase keeps the current pose', () => {
     const g = new BimanualGrip(START, L, R, VIEW, 0, EXACT);
     const moved = g.update(...hands([0.5, 0.5, 0], 1.5, 0.7), 33);

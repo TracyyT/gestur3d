@@ -221,7 +221,7 @@ export class BimanualGrip {
     this.snap = {
       pose: { position: [...pose.position], rotation: [...pose.rotation], scale: pose.scale },
       pivot: mid(a, b),
-      logSep: Math.log(Math.max(sep, 1e-6)),
+      logSep: this.logSpread(sep, palms),
       angle: this.angle,
       logPalm: logPalms(palms),
     };
@@ -271,7 +271,7 @@ export class BimanualGrip {
     let roll = 0;
     if (!this.holding) {
       this.angle += angleDiff(this.screenAngle(d), this.angle);
-      const rawLogK = Math.log(Math.max(sep, 1e-6)) - this.snap.logSep;
+      const rawLogK = this.logSpread(sep, palms) - this.snap.logSep;
       logK = this.scaleFilter.filter(softDeadZone(rawLogK, o.scaleDeadZone), tMs);
       roll = this.rollFilter.filter(
         softDeadZone(this.angle - this.snap.angle, o.rollDeadZone),
@@ -309,7 +309,7 @@ export class BimanualGrip {
       rotation: quatNormalize(quatMultiply(turn, this.snap.pose.rotation)),
       scale,
       scaleFactor: k,
-      spread: Math.exp(Math.log(Math.max(sep, 1e-6)) - this.snap.logSep),
+      spread: Math.exp(this.logSpread(sep, palms) - this.snap.logSep),
       turn: this.angle - this.snap.angle,
       roll,
       depth,
@@ -317,6 +317,17 @@ export class BimanualGrip {
       holding: this.holding,
     };
     return this.last;
+  }
+
+  /**
+   * Log of the hand spread that drives scale. With depth on, it's measured in
+   * palm widths: pushing both hands toward the camera makes them look farther
+   * apart on screen, and that should move the object, not grow it.
+   */
+  private logSpread(sep: number, palms?: Palms) {
+    const raw = Math.log(Math.max(sep, 1e-6));
+    const lp = this.opts.depthGain > 0 ? logPalms(palms) : null;
+    return lp === null ? raw : raw - lp;
   }
 
   private screenAngle(d: Readonly<Vec3>) {
