@@ -1,5 +1,8 @@
 import { useCallback, type KeyboardEvent } from 'react';
 import { keyToCommand } from '@/core/interaction/keyboard';
+import { useMenu } from '@/features/menu/menuStore';
+import { visibleSceneRect } from '@/scene/framing';
+import { useHudLayout } from '@/stores/hudLayout';
 import { useScene } from '@/stores/scene';
 import { useSettings } from '@/stores/settings';
 
@@ -18,6 +21,39 @@ export function useWorkspaceKeyboard(onToggleHelp: () => void) {
         return;
       }
       if (!useSettings.getState().mouseKeyboardEnabled) return;
+
+      // Radial menu: M opens it in the middle of the scene; while open it
+      // takes the arrow keys, Enter and Esc.
+      const menu = useMenu.getState();
+      if (menu.open) {
+        const keys: Record<string, () => void> = {
+          ArrowRight: () => menu.step(1),
+          ArrowDown: () => menu.step(1),
+          ArrowLeft: () => menu.step(-1),
+          ArrowUp: () => menu.step(-1),
+          Enter: () => menu.choose(),
+          ' ': () => menu.choose(),
+          Escape: () => menu.back(),
+          m: () => menu.close(),
+          M: () => menu.close(),
+        };
+        const fn = keys[e.key];
+        if (fn) {
+          e.preventDefault();
+          fn();
+        }
+        if (e.key !== 'Tab') return;
+      }
+      if ((e.key === 'm' || e.key === 'M') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        const r = visibleSceneRect(
+          useHudLayout.getState().panelsVisible,
+          window.innerWidth,
+          window.innerHeight,
+        );
+        menu.openAt(r.left + r.width / 2, r.top + r.height / 2, 'keyboard');
+        return;
+      }
 
       const { objects, selectedId, dispatch, undo } = useScene.getState();
 
