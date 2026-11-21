@@ -6,30 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
  * landmarks via the test hooks. No camera or model needed.
  */
 
-type UV = { u: number; v: number };
-type Vec3 = [number, number, number];
-interface G3D {
-  objects(): Array<{ id: string; position: Vec3 }>;
-  selectedId(): string | null;
-  pointers(): Array<{ phase: string; grabbedId: string | null }>;
-  objectUV(id: string): UV | null;
-  playGrab(s: {
-    from: UV;
-    to: UV;
-    handedness?: 'Left' | 'Right';
-    dropoutMs?: number;
-    grip?: number;
-    loosenTo?: number;
-  }): Promise<void>;
-  playSweep(from: UV, to: UV, handedness?: 'Left' | 'Right'): Promise<void>;
-  playHold(uv: UV, ms: number, jitter?: number): Promise<void>;
-}
-declare global {
-  interface Window {
-    __G3D__: G3D;
-    __G3D_TEST_HOOKS__?: boolean;
-  }
-}
+import './support/g3d';
 
 async function open(page: Page, width: number, height: number, panels: boolean) {
   // HAND_E2E_CPU_THROTTLE=4 simulates a slow machine (few rendered frames per

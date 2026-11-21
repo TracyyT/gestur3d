@@ -126,8 +126,13 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
     } else {
       // Hands already arrive smoothed; keep the object tight to the hand cursor.
       easing.damp3(g.position, object.position, handHeld ? 0.03 : 0.08, delta);
-      easing.dampQ(g.quaternion, object.rotation, 0.1, delta);
-      easing.damp3(g.scale, [object.scale, object.scale, object.scale], 0.1, delta);
+      easing.dampQ(g.quaternion, object.rotation, handHeld ? 0.03 : 0.1, delta);
+      easing.damp3(
+        g.scale,
+        [object.scale, object.scale, object.scale],
+        handHeld ? 0.03 : 0.1,
+        delta,
+      );
     }
 
     const m = body.current?.material as ShaderMaterial | undefined;

@@ -1,6 +1,6 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
-import { Plane, Raycaster, Vector2, Vector3 } from 'three';
+import { Mesh, Plane, Raycaster, Sphere, Vector2, Vector3 } from 'three';
 import type { Vec3 } from '@/core/interaction/commands';
 import {
   HandInteractionEngine,
@@ -46,6 +46,10 @@ export function HandController() {
       plane: new Plane(),
       v: new Vector3(),
       n: new Vector3(),
+      right: new Vector3(),
+      up: new Vector3(),
+      back: new Vector3(),
+      sphere: new Sphere(),
     }),
     [],
   );
@@ -96,7 +100,12 @@ export function HandController() {
     const rect = visibleSceneRect(useHudLayout.getState().panelsVisible, size.width, size.height);
     const box = interactionBox(settings.handReach, aspect, rect.width / rect.height);
 
-    const { raycaster, ndc, plane, v, n } = tools;
+    const { raycaster, ndc, plane, v, n, right, up, back, sphere } = tools;
+    state.camera.matrixWorld.extractBasis(right, up, back);
+    const toScreen = (p: Vector3) => {
+      p.project(state.camera);
+      return { x: ((p.x + 1) / 2) * size.width, y: ((1 - p.y) / 2) * size.height };
+    };
     const aim = (x: number, y: number) => {
       ndc.fromArray(screenToNdc(x, y, size.width, size.height));
       raycaster.setFromCamera(ndc, state.camera);
@@ -116,6 +125,21 @@ export function HandController() {
       },
       objectPosition: (id) =>
         useScene.getState().objects.find((o) => o.id === id)?.position ?? null,
+      objectPose: (id) => useScene.getState().objects.find((o) => o.id === id) ?? null,
+      view: () => ({
+        right: [right.x, right.y, right.z],
+        up: [up.x, up.y, up.z],
+      }),
+      near: (screen, id, slack) => {
+        const mesh = objectRegistry.get(id);
+        if (!(mesh instanceof Mesh)) return false;
+        if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+        sphere.copy(mesh.geometry.boundingSphere!).applyMatrix4(mesh.matrixWorld);
+        const c = toScreen(v.copy(sphere.center));
+        const edge = toScreen(v.copy(sphere.center).addScaledVector(right, sphere.radius));
+        const r = Math.hypot(edge.x - c.x, edge.y - c.y) * slack;
+        return Math.hypot(screen.x - c.x, screen.y - c.y) <= r;
+      },
     };
     const scene = useScene.getState();
     const blocked = (id: string) => handRuntime.mouseDragId === id;
@@ -147,7 +171,10 @@ export function HandController() {
       handRuntime.frames.tick(now);
       handRuntime.latency.tick(now, now - (f.captureTime ?? f.timestamp));
     }
-    if (batch.length) lastFrame.current = { wall: now, ts: batch.at(-1)!.timestamp };
+    if (batch.length) {
+      lastFrame.current = { wall: now, ts: batch.at(-1)!.timestamp };
+      handRuntime.lastFrameTs = lastFrame.current.ts;
+    }
 
     // While frames are flowing, measure the lost-hand grace in frame time so a
     // render stall can't expire a hand whose return is already queued. If
@@ -179,6 +206,7 @@ export function HandController() {
 
     handRuntime.pointers = result.pointers;
     handRuntime.held = result.held;
+    handRuntime.twoHand = result.twoHand;
     handRuntime.hovered = new Set(result.pointers.flatMap((p) => (p.hoverId ? [p.hoverId] : [])));
   });
 

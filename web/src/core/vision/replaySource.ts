@@ -41,6 +41,11 @@ export class ReplayHandSource implements HandSource {
     return this.recording.cameraAspect;
   }
 
+  /** Recording time (ms) of a frame timestamp this source emitted. */
+  recordingTime(timestamp: number) {
+    return (timestamp - this.startedAt) * this.opts.speed;
+  }
+
   start() {
     if (this.handle !== null) return;
     this.startedAt = this.opts.now();

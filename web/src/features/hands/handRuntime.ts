@@ -1,4 +1,4 @@
-import type { HandPointer } from '@/core/interaction/handInteraction';
+import type { HandPointer, TwoHandInfo } from '@/core/interaction/handInteraction';
 import { RateMeter } from '@/core/vision/rateMeter';
 
 /**
@@ -10,6 +10,10 @@ export const handRuntime = {
   pointers: [] as HandPointer[],
   /** objectId → pointer id holding it. */
   held: new Map<string, number>(),
+  /** Timestamp of the last detection frame the interaction engine processed. */
+  lastFrameTs: 0,
+  /** Active two-hand grabs. */
+  twoHand: [] as TwoHandInfo[],
   /** Objects currently hovered by a hand. */
   hovered: new Set<string>(),
   /** Object the mouse is dragging, so hands can't grab it. */
@@ -24,6 +28,7 @@ export const handRuntime = {
   reset() {
     this.pointers = [];
     this.held.clear();
+    this.twoHand = [];
     this.hovered.clear();
     this.frames.reset();
     this.latency.reset();

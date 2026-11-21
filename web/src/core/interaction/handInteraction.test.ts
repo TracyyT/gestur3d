@@ -169,7 +169,7 @@ describe('HandInteractionEngine', () => {
     expect(gone.commands).toHaveLength(0);
   });
 
-  it('one hand per object, and mouse-held objects are off limits', () => {
+  it('a second hand on a held object joins it, and mouse-held objects are off limits', () => {
     const e = new HandInteractionEngine();
     const s = scene({ a: [2, 1, 0] });
     const left = (p: PinchState) => hand(200, 100, p, { id: 2, handedness: 'Left' });
@@ -177,7 +177,9 @@ describe('HandInteractionEngine', () => {
     e.update(33, [hand(200, 100, START), left(OPEN)], s, never);
     const r = e.update(66, [hand(200, 100, HOLD), left(START)], s, never);
     expect(r.held.get('a')).toBe(1);
-    expect(r.pointers.find((p) => p.id === 2)!.phase).toBe('pinching');
+    // M3: the second hand joins as a two-hand grab instead of being ignored.
+    expect(r.pointers.find((p) => p.id === 2)!.phase).toBe('grabbing');
+    expect(r.twoHand.map((t) => t.pointerIds)).toEqual([[1, 2]]);
 
     const e2 = new HandInteractionEngine();
     e2.update(0, [hand(200, 100, OPEN)], s, never);

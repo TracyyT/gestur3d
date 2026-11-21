@@ -32,6 +32,20 @@ export interface GrabScript {
   loosenTo?: number;
 }
 
+/** One keyframe of a scripted hand, aimed at a scene-rect UV. */
+export interface HandKey extends UV {
+  at: number;
+  pinch: number;
+  visible?: boolean;
+}
+
+export interface TwoHandScript {
+  right: HandKey[];
+  left: HandKey[];
+  speed?: number;
+  jitter?: number;
+}
+
 const ASPECT = 16 / 9;
 
 function sceneRect() {
@@ -116,6 +130,31 @@ function grabRecording({
   return scriptedRecording(keys, { handedness, aspect: ASPECT, jitter });
 }
 
+function handRecording(keys: HandKey[], handedness: Handedness, jitter = 0): Recording {
+  return scriptedRecording(
+    keys.map(({ at, u, v, pinch, visible }) => {
+      const [cx, cy] = wristAt({ u, v }, pinch, handedness);
+      return { at, cx, cy, pinch, visible };
+    }),
+    { handedness, aspect: ASPECT, jitter },
+  );
+}
+
+/** Two single-hand recordings played together, frame by frame. */
+function twoHandRecording({ right, left, jitter = 0 }: TwoHandScript): Recording {
+  const r = handRecording(right, 'Right', jitter);
+  const l = handRecording(left, 'Left', jitter);
+  const n = Math.max(r.frames.length, l.frames.length);
+  const frames: Recording['frames'] = [];
+  for (let i = 0; i < n; i++) {
+    const a = r.frames[i];
+    const b = l.frames[i];
+    const base = (a ?? b)!;
+    frames.push({ ...base, hands: [...(a?.hands ?? []), ...(b?.hands ?? [])] });
+  }
+  return { ...r, frames };
+}
+
 /**
  * Test-only API on window.__G3D__, enabled when a test sets
  * window.__G3D_TEST_HOOKS__ = true before the page loads. Lets end-to-end
@@ -126,7 +165,20 @@ export function installTestHooks() {
   if (!w.__G3D_TEST_HOOKS__) return;
   w.__G3D__ = {
     objects: () =>
-      useScene.getState().objects.map((o) => ({ id: o.id, position: [...o.position] })),
+      useScene.getState().objects.map((o) => ({
+        id: o.id,
+        position: [...o.position],
+        rotation: [...o.rotation],
+        scale: o.scale,
+      })),
+    twoHand: () => handRuntime.twoHand.map((t) => ({ ...t })),
+    /** Script time (ms) of the last detection frame the engine processed, during replay. */
+    scriptTime: () => {
+      const source = useHandTracking.getState().source;
+      return source instanceof ReplayHandSource
+        ? source.recordingTime(handRuntime.lastFrameTs)
+        : null;
+    },
     selectedId: () => useScene.getState().selectedId,
     pointers: () => handRuntime.pointers.map((p) => ({ ...p, screen: { ...p.screen } })),
     sceneRect,
@@ -140,6 +192,8 @@ export function installTestHooks() {
     },
     play,
     playGrab: (script: GrabScript) => play(grabRecording(script), script.speed),
+    /** Both hands, each keyframed in scene UV. */
+    playTwoHand: (script: TwoHandScript) => play(twoHandRecording(script), script.speed),
     /** A pinch closed over empty space, then swept across `to` (must not grab). */
     playSweep: (from: UV, to: UV, handedness: Handedness = 'Right') => {
       const k = (at: number, uv: UV, pinch: number): Keyframe => {
