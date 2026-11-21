@@ -23,7 +23,16 @@ export const KIND_LABEL: Record<ObjectKind, string> = {
   sphere: 'Sphere',
   cube: 'Cube',
   sculpture: 'Sculpture',
+  ring: 'Ring',
+  pyramid: 'Pyramid',
+  crystal: 'Crystal',
+  capsule: 'Capsule',
+  helix: 'Helix',
+  gyroscope: 'Gyroscope',
 };
+
+/** Every kind, in the order the add menus show them. */
+export const OBJECT_KINDS = Object.keys(KIND_LABEL) as ObjectKind[];
 
 export function createInitialScene(): SceneModel {
   const objects: SceneObject[] = [

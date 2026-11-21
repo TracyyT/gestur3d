@@ -7,7 +7,16 @@ import type { Quat } from '@/core/math/quat';
 
 export type Vec3 = [number, number, number];
 
-export type ObjectKind = 'sphere' | 'cube' | 'sculpture';
+export type ObjectKind =
+  | 'sphere'
+  | 'cube'
+  | 'sculpture'
+  | 'ring'
+  | 'pyramid'
+  | 'crystal'
+  | 'capsule'
+  | 'helix'
+  | 'gyroscope';
 
 export type InputSource = 'mouse' | 'keyboard' | 'gesture' | 'replay' | 'ui';
 
