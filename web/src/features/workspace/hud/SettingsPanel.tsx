@@ -42,6 +42,12 @@ export function SettingsPanel() {
             onChange={(v) => s.set('handReach', v)}
             hint="How much of the camera view your hand moves across to cover the scene. Lower = less arm movement."
           />
+          <Toggle
+            label="Two-hand depth"
+            hint="Holding with both hands, push them toward the camera to bring the object closer."
+            checked={s.twoHandDepth}
+            onChange={(v) => s.set('twoHandDepth', v)}
+          />
         </section>
 
         <section className="space-y-4 border-t border-line pt-4" aria-label="Visuals">

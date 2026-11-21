@@ -53,6 +53,14 @@ export interface BimanualOptions {
   minSeparation: number;
   scaleFilter: OneEuroParams;
   rollFilter: OneEuroParams;
+  /**
+   * Depth push/pull: world units the object moves toward the camera per unit
+   * of log palm-size change (both hands averaged). 0 = off.
+   */
+  depthGain: number;
+  /** Palm-size changes smaller than this (log ratio) are ignored. */
+  depthDeadZone: number;
+  depthFilter: OneEuroParams;
 }
 
 export const DEFAULT_BIMANUAL_OPTIONS: BimanualOptions = {
@@ -65,16 +73,27 @@ export const DEFAULT_BIMANUAL_OPTIONS: BimanualOptions = {
   minSeparation: 0.35,
   scaleFilter: { minCutoff: 1.2, beta: 1.0, dCutoff: 1.0 },
   rollFilter: { minCutoff: 1.0, beta: 0.6, dCutoff: 1.0 },
+  depthGain: 0,
+  depthDeadZone: 0.04,
+  depthFilter: { minCutoff: 0.8, beta: 0.5, dCutoff: 1.0 },
 };
+
+/** Gain used when the depth setting is on. */
+export const DEPTH_GAIN = 3;
 
 /** Two points (one per hand, same order as the grips) to measure scale and roll from. */
 export type Span = readonly [Readonly<Vec3>, Readonly<Vec3>];
+
+/** Apparent palm sizes of the two hands, same order as the grips. */
+export type Palms = readonly [number, number];
 
 export interface BimanualResult extends Pose {
   /** Scale relative to the snapshot, after limits. */
   scaleFactor: number;
   /** Roll since the snapshot, radians, counter-clockwise on screen. */
   roll: number;
+  /** Depth offset since the snapshot, world units toward the camera. */
+  depth: number;
   /** The scale target is at or beyond a limit. */
   atLimit: boolean;
   /** Hands too close together: scale and roll are holding. */
@@ -118,6 +137,11 @@ export function softUnclampLog(y: number, lo: number, hi: number, band: number):
   return y;
 }
 
+function logPalms(palms?: Palms): number | null {
+  if (!palms || !(palms[0] > 0) || !(palms[1] > 0)) return null;
+  return (Math.log(palms[0]) + Math.log(palms[1])) / 2;
+}
+
 /** Shortest signed difference a − b, in (−π, π]. */
 const angleDiff = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
@@ -129,6 +153,8 @@ interface Snapshot {
   logSep: number;
   /** Screen-plane angle of the hand line at the snapshot. */
   angle: number;
+  /** Mean log palm size at the snapshot, if palms were given. */
+  logPalm: number | null;
 }
 
 export class BimanualGrip {
@@ -142,6 +168,7 @@ export class BimanualGrip {
   private angle = 0;
   private readonly scaleFilter: OneEuroFilter;
   private readonly rollFilter: OneEuroFilter;
+  private readonly depthFilter: OneEuroFilter;
   private last!: BimanualResult;
 
   constructor(
@@ -152,13 +179,15 @@ export class BimanualGrip {
     tMs: number,
     opts: Partial<BimanualOptions> = {},
     span?: Span,
+    palms?: Palms,
   ) {
     this.opts = { ...DEFAULT_BIMANUAL_OPTIONS, ...opts };
     this.view = view;
     this.rollAxis = cross(view.right, view.up);
     this.scaleFilter = new OneEuroFilter(this.opts.scaleFilter);
     this.rollFilter = new OneEuroFilter(this.opts.rollFilter);
-    this.rebase(start, a, b, tMs, span);
+    this.depthFilter = new OneEuroFilter(this.opts.depthFilter);
+    this.rebase(start, a, b, tMs, span, palms);
   }
 
   /** Current output, without new input. */
@@ -173,7 +202,14 @@ export class BimanualGrip {
    * `span` (optional) gives separate points to measure scale and roll from,
    * e.g. the fingertips, which can come closer together than the grips.
    */
-  rebase(pose: Pose, a: Readonly<Vec3>, b: Readonly<Vec3>, tMs: number, span?: Span) {
+  rebase(
+    pose: Pose,
+    a: Readonly<Vec3>,
+    b: Readonly<Vec3>,
+    tMs: number,
+    span?: Span,
+    palms?: Palms,
+  ) {
     const d = span ? sub(span[1], span[0]) : sub(b, a);
     const sep = Math.hypot(d[0], d[1], d[2]);
     this.holding = sep < this.opts.minSeparation;
@@ -183,23 +219,33 @@ export class BimanualGrip {
       pivot: mid(a, b),
       logSep: Math.log(Math.max(sep, 1e-6)),
       angle: this.angle,
+      logPalm: logPalms(palms),
     };
     this.scaleFilter.reset();
     this.rollFilter.reset();
+    this.depthFilter.reset();
     this.scaleFilter.filter(0, tMs);
     this.rollFilter.filter(0, tMs);
+    this.depthFilter.filter(0, tMs);
     this.last = {
       ...this.snap.pose,
       position: [...pose.position],
       rotation: [...pose.rotation],
       scaleFactor: 1,
       roll: 0,
+      depth: 0,
       atLimit: false,
       holding: this.holding,
     };
   }
 
-  update(a: Readonly<Vec3>, b: Readonly<Vec3>, tMs: number, span?: Span): BimanualResult {
+  update(
+    a: Readonly<Vec3>,
+    b: Readonly<Vec3>,
+    tMs: number,
+    span?: Span,
+    palms?: Palms,
+  ): BimanualResult {
     const o = this.opts;
     const d = span ? sub(span[1], span[0]) : sub(b, a);
     const sep = Math.hypot(d[0], d[1], d[2]);
@@ -208,7 +254,7 @@ export class BimanualGrip {
     // keep translating, and re-snapshot on both edges so neither jumps.
     const tooClose = sep < (this.holding ? o.minSeparation * 1.2 : o.minSeparation);
     if (tooClose !== this.holding) {
-      this.rebase(this.last, a, b, tMs, span);
+      this.rebase(this.last, a, b, tMs, span, palms);
       this.holding = tooClose;
       this.last = { ...this.last, holding: tooClose };
       return this.last;
@@ -236,17 +282,29 @@ export class BimanualGrip {
     const scale = Math.exp(softClampLog(rawLog, lo, hi, o.softBand));
     const k = scale / s0;
 
+    // Depth: both palms looking bigger than at the snapshot = hands pushed
+    // toward the camera, so the object comes forward.
+    let depth = 0;
+    const lp = logPalms(palms);
+    if (o.depthGain > 0 && lp !== null && this.snap.logPalm !== null) {
+      depth =
+        o.depthGain *
+        this.depthFilter.filter(softDeadZone(lp - this.snap.logPalm, o.depthDeadZone), tMs);
+    }
+    const toward = mul(this.rollAxis, depth / (Math.hypot(...this.rollAxis) || 1));
+
     const turn = quatFromAxisAngle(this.rollAxis, roll);
-    const position =
+    const planar =
       o.pivot === 'hands'
         ? add(pivot, quatRotateVec3(turn, mul(sub(this.snap.pose.position, this.snap.pivot), k)))
         : add(this.snap.pose.position, sub(pivot, this.snap.pivot));
     this.last = {
-      position,
+      position: add(planar, toward),
       rotation: quatNormalize(quatMultiply(turn, this.snap.pose.rotation)),
       scale,
       scaleFactor: k,
       roll,
+      depth,
       atLimit: rawLog >= hi || rawLog <= lo,
       holding: this.holding,
     };

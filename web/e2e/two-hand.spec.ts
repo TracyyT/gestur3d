@@ -21,7 +21,18 @@ interface Sample {
   span: { d: number; angle: number } | null;
 }
 
-async function open(page: Page, width: number, height: number, panels: boolean) {
+async function open(
+  page: Page,
+  width: number,
+  height: number,
+  panels: boolean,
+  settings: Record<string, unknown> = {},
+) {
+  if (Object.keys(settings).length) {
+    await page.addInitScript((state) => {
+      localStorage.setItem('gestur3d.settings', JSON.stringify({ state, version: 2 }));
+    }, settings);
+  }
   const stall = Number(process.env.HAND_E2E_FRAME_STALL_MS ?? 0);
   if (stall > 0) {
     await page.addInitScript((ms: number) => {
@@ -429,4 +440,39 @@ test.describe('two-hand grab', () => {
     ).toBe(true);
     expect(maxDrift(samples, 2000, 4250)).toBeLessThanOrEqual(1);
   });
+
+  for (const depth of [true, false]) {
+    test(`pushing both hands toward the camera ${depth ? 'brings the cube forward' : 'does nothing with depth off'}`, async ({
+      page,
+    }) => {
+      await open(page, 1440, 900, true, depth ? { twoHandDepth: true } : {});
+      const c = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
+      const at = await px(page);
+      const R = at(20, 0, c);
+      const L = at(-100, 120, c);
+      // Both hands grow 25% (toward the camera) from 1.4 s to 2.2 s, cursors still.
+      const keys = (p: UV, joinAt: number): HandKey[] => [
+        { at: 0, ...p, pinch: 0 },
+        { at: joinAt, ...p, pinch: 0 },
+        { at: joinAt + 150, ...p, pinch: 1 },
+        { at: 1400, ...p, pinch: 1, size: 0.12 },
+        { at: 2200, ...p, pinch: 1, size: 0.15 },
+        { at: 2800, ...p, pinch: 1, size: 0.15 },
+        { at: 2950, ...p, pinch: 0, size: 0.15 },
+        { at: 3300, ...p, pinch: 0, size: 0.15 },
+      ];
+      const before = await cube(page);
+      const samples = await playSampled(page, keys(R, 400), keys(L, 900));
+      expect(samples.some((s) => s.two === 1)).toBe(true);
+      const after = await cube(page);
+      const dz = after.position[2] - before.position[2];
+      if (depth) {
+        // 3 × (ln 1.25 − 0.04) ≈ 0.55 toward the camera (+z), give or take smoothing.
+        expect(dz).toBeGreaterThan(0.4);
+        expect(dz).toBeLessThan(0.65);
+      } else {
+        expect(Math.abs(dz)).toBeLessThan(1e-6);
+      }
+    });
+  }
 });

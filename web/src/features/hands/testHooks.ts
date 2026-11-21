@@ -37,6 +37,8 @@ export interface HandKey extends UV {
   at: number;
   pinch: number;
   visible?: boolean;
+  /** Synthetic hand size (default 0.12); bigger = closer to the camera. */
+  size?: number;
 }
 
 export interface TwoHandScript {
@@ -57,13 +59,14 @@ function sceneRect() {
 }
 
 /** Raw camera wrist position that puts the cursor at a scene-rect UV. */
-function wristAt(uv: UV, pinch: number, handedness: Handedness): [number, number] {
+function wristAt(uv: UV, pinch: number, handedness: Handedness, size = 0.12): [number, number] {
   const rect = sceneRect();
   const box = interactionBox(useSettings.getState().handReach, ASPECT, rect.width / rect.height);
   const target = screenToCamera(uv.u, uv.v, box);
   return wristForAnchor(target, {
     pinch,
     handedness,
+    size,
     aspect: ASPECT,
     mode: DEFAULT_TRACKER_OPTIONS.anchorMode,
   });
@@ -132,9 +135,9 @@ function grabRecording({
 
 function handRecording(keys: HandKey[], handedness: Handedness, jitter = 0): Recording {
   return scriptedRecording(
-    keys.map(({ at, u, v, pinch, visible }) => {
-      const [cx, cy] = wristAt({ u, v }, pinch, handedness);
-      return { at, cx, cy, pinch, visible };
+    keys.map(({ at, u, v, pinch, visible, size }) => {
+      const [cx, cy] = wristAt({ u, v }, pinch, handedness, size);
+      return { at, cx, cy, pinch, visible, size };
     }),
     { handedness, aspect: ASPECT, jitter },
   );

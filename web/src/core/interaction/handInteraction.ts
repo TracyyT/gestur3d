@@ -1,6 +1,6 @@
 import type { PinchState } from '@/core/tracking/pinch';
 import type { Handedness } from '@/core/vision/types';
-import { BimanualGrip, type Pose, type ViewBasis } from './bimanual';
+import { BimanualGrip, DEPTH_GAIN, type Pose, type ViewBasis } from './bimanual';
 import type { Command, Vec3 } from './commands';
 import { clampPosition } from './sceneModel';
 
@@ -26,6 +26,8 @@ export interface PointerInput {
    * meet while their knuckle cursors can't.
    */
   tip?: ScreenPos;
+  /** Apparent palm size (larger = closer to the camera), for two-hand depth. */
+  palm?: number;
   pinch: PinchState;
 }
 
@@ -73,6 +75,8 @@ export interface TwoHandInfo {
   scaleFactor: number;
   /** Roll since the two-hand grab started, radians. */
   roll: number;
+  /** Depth moved since the last snapshot, world units toward the camera. */
+  depth: number;
   scale: number;
   atLimit: boolean;
   /** Hands too close together: scale and roll hold. */
@@ -116,6 +120,11 @@ interface TwoHandSession {
   /** Either hand's fingers are opening: hold everything still. */
   paused: boolean;
   pose: Pose;
+  /**
+   * Camera-facing plane the grips are measured on, fixed at each snapshot so
+   * depth moves don't change how hand motion maps to the scene.
+   */
+  planeOrigin: Vec3;
   info: TwoHandInfo;
 }
 
@@ -147,9 +156,19 @@ const DEFAULT_VIEW: ViewBasis = { right: [1, 0, 0], up: [0, 1, 0] };
  * - One hand lost: the other keeps moving it; scale and rotation hold. Both
  *   lost: it freezes. A hand whose track expires leaves the grab.
  */
+export interface EngineOptions {
+  /** Two-hand depth push/pull from palm size. */
+  depth: boolean;
+}
+
 export class HandInteractionEngine {
   private memory = new Map<number, PointerMemory>();
   private sessions = new Map<string, TwoHandSession>();
+  private options: EngineOptions = { depth: false };
+
+  configure(options: Partial<EngineOptions>) {
+    this.options = { ...this.options, ...options };
+  }
 
   update(
     now: number,
@@ -236,6 +255,7 @@ export class HandInteractionEngine {
             driver: 'none',
             paused: false,
             pose,
+            planeOrigin: [...pose.position],
             info: {
               objectId: joinId,
               pointerIds: ids,
@@ -243,6 +263,7 @@ export class HandInteractionEngine {
               lostId: null,
               scaleFactor: 1,
               roll: 0,
+              depth: 0,
               scale: pose.scale,
               atLimit: false,
               holding: false,
@@ -436,19 +457,31 @@ export class HandInteractionEngine {
 
     if (driver === 'two') {
       const view = scene.view?.() ?? DEFAULT_VIEW;
-      const origin = s.pose.position;
+      if (rebase || !s.grip) s.planeOrigin = [...s.pose.position];
+      const origin = s.planeOrigin;
       const ga = scene.planePoint(a.screen, origin);
       const gb = scene.planePoint(b.screen, origin);
       const ta = a.tip && scene.planePoint(a.tip, origin);
       const tb = b.tip && scene.planePoint(b.tip, origin);
       const span = ta && tb ? ([ta, tb] as const) : undefined;
+      const palms = a.palm && b.palm ? ([a.palm, b.palm] as const) : undefined;
       if (ga && gb) {
         if (rebase || !s.grip) {
-          if (s.grip) s.grip.rebase(s.pose, ga, gb, now, span);
-          else s.grip = new BimanualGrip(s.pose, ga, gb, view, now, {}, span);
+          if (s.grip) s.grip.rebase(s.pose, ga, gb, now, span, palms);
+          else
+            s.grip = new BimanualGrip(
+              s.pose,
+              ga,
+              gb,
+              view,
+              now,
+              { depthGain: this.options.depth ? DEPTH_GAIN : 0 },
+              span,
+              palms,
+            );
         }
         if (!paused) {
-          const r = s.grip.update(ga, gb, now, span);
+          const r = s.grip.update(ga, gb, now, span, palms);
           const position = clampPosition(r.position);
           const moved =
             Math.hypot(
@@ -472,6 +505,7 @@ export class HandInteractionEngine {
             ...s.info,
             scaleFactor: r.scaleFactor,
             roll: r.roll,
+            depth: r.depth,
             scale: r.scale,
             atLimit: r.atLimit,
             holding: r.holding,

@@ -7,6 +7,7 @@ import {
 import { OneEuroVec, smoothingToParams, type OneEuroParams } from './oneEuro';
 import {
   PinchDetector,
+  palmSize,
   pinchRatio,
   sensitivityToThresholds,
   type PinchState,
@@ -50,6 +51,8 @@ export interface TrackSnapshot {
    * so two-hand scale and turn measure from here.
    */
   tip: [number, number];
+  /** Smoothed apparent palm size (see `palmSize`); larger = closer to the camera. */
+  palm: number;
   pinch: PinchState;
   /** Timestamp (ms) of the last detection that included this hand. */
   lastSeen: number;
@@ -80,10 +83,12 @@ interface Track {
   status: TrackStatus;
   filter: OneEuroVec;
   tipFilter: OneEuroVec;
+  palmFilter: OneEuroVec;
   pinchDetector: PinchDetector;
   anchor: [number, number];
   rawAnchor: [number, number];
   tip: [number, number];
+  palm: number;
   pinch: PinchState;
   lastSeen: number;
   lostSince: number | null;
@@ -132,6 +137,7 @@ export class HandTracker {
     for (const t of this.tracks) {
       t.filter.setParams(this.params);
       t.tipFilter.setParams(this.params);
+      t.palmFilter.setParams(this.params);
       t.pinchDetector.thresholds = this.thresholds;
     }
   }
@@ -206,6 +212,7 @@ export class HandTracker {
       anchor: t.anchor,
       rawAnchor: t.rawAnchor,
       tip: t.tip,
+      palm: t.palm,
       pinch: t.pinch,
       lastSeen: t.lastSeen,
       lostSince: t.lostSince,
@@ -223,10 +230,12 @@ export class HandTracker {
       status: 'tracking',
       filter: new OneEuroVec(2, this.params),
       tipFilter: new OneEuroVec(2, this.params),
+      palmFilter: new OneEuroVec(1, this.params),
       pinchDetector: new PinchDetector(this.thresholds),
       anchor: [0, 0],
       rawAnchor: [0, 0],
       tip: [0, 0],
+      palm: 0,
       pinch: NO_PINCH,
       lastSeen: 0,
       lostSince: null,
@@ -247,6 +256,7 @@ export class HandTracker {
     track.rawAnchor = raw;
     const [tx, ty] = track.tipFilter.filter(anchorPoint(hand.image, 'pinch'), now);
     track.tip = [tx!, ty!];
+    track.palm = track.palmFilter.filter([palmSize(hand.image, aspect)], now)[0]!;
     track.pinch = track.pinchDetector.update(pinchRatio(hand.world, hand.image, aspect), now);
     track.lastSeen = now;
     track.status = 'tracking';

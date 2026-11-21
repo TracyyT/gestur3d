@@ -16,6 +16,8 @@ export interface Keyframe {
   pinch: number;
   /** false = hand not detected at this keyframe (tracking dropout). */
   visible?: boolean;
+  /** Hand size at this keyframe (overrides the script's); bigger = closer to the camera. */
+  size?: number;
 }
 
 export interface ScriptOptions {
@@ -51,7 +53,7 @@ export function scriptedRecording(keys: Keyframe[], opts: ScriptOptions = {}): R
         cx: a.cx + (b.cx - a.cx) * k,
         cy: a.cy + (b.cy - a.cy) * k,
         pinch: a.pinch + (b.pinch - a.pinch) * k,
-        size,
+        size: (a.size ?? size) + ((b.size ?? size) - (a.size ?? size)) * k,
         handedness,
         aspect,
       });

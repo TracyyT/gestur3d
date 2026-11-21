@@ -147,3 +147,16 @@ export class PinchDetector {
     this.smoothed = null;
   }
 }
+
+/**
+ * Apparent palm size in the image (aspect-corrected, camera-normalized): the
+ * mean side of the wrist / index-knuckle / pinky-knuckle triangle. It grows as
+ * the hand comes toward the camera, so it stands in for depth. Using three
+ * sides makes it less sensitive to the hand rolling than one length, and none
+ * of the points move when the fingers pinch.
+ */
+export function palmSize(image: ArrayLike<number>, aspect = 16 / 9): number {
+  const d = (a: number, b: number) =>
+    Math.hypot((image[a * 3]! - image[b * 3]!) * aspect, image[a * 3 + 1]! - image[b * 3 + 1]!);
+  return (d(L.Wrist, L.IndexMcp) + d(L.Wrist, L.PinkyMcp) + d(L.IndexMcp, L.PinkyMcp)) / 3;
+}
