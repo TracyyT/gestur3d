@@ -19,7 +19,13 @@ export function useWorkspaceKeyboard(onToggleHelp: () => void) {
       }
       if (!useSettings.getState().mouseKeyboardEnabled) return;
 
-      const { objects, selectedId, dispatch } = useScene.getState();
+      const { objects, selectedId, dispatch, undo } = useScene.getState();
+
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        undo('keyboard');
+        return;
+      }
 
       if (e.key === 'Tab') {
         const i = objects.findIndex((o) => o.id === selectedId);

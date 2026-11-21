@@ -53,6 +53,8 @@ export function ObjectsPanel() {
   const objects = useScene((s) => s.objects);
   const selectedId = useScene((s) => s.selectedId);
   const dispatch = useScene((s) => s.dispatch);
+  const undo = useScene((s) => s.undo);
+  const canUndo = useScene((s) => s.undoStack.length > 0);
   const full = objects.length >= MAX_OBJECTS;
   const selected = objects.find((o) => o.id === selectedId);
 
@@ -157,6 +159,9 @@ export function ObjectsPanel() {
             onClick={() => selectedId && dispatch({ type: 'remove', id: selectedId }, 'ui')}
           >
             Remove selected
+          </Button>
+          <Button size="sm" variant="ghost" disabled={!canUndo} onClick={() => undo('ui')}>
+            Undo
           </Button>
           <Button size="sm" variant="ghost" onClick={() => dispatch({ type: 'reset' }, 'ui')}>
             Reset scene

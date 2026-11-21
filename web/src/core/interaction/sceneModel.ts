@@ -204,6 +204,16 @@ export function applyCommand(model: SceneModel, cmd: Command): SceneModel {
         selectedId: model.selectedId === cmd.id ? null : model.selectedId,
       };
     }
+    case 'restore': {
+      if (model.objects.some((o) => o.id === cmd.object.id)) return model;
+      const objects = [...model.objects];
+      objects.splice(Math.min(Math.max(0, cmd.index), objects.length), 0, cmd.object);
+      return {
+        ...model,
+        objects,
+        selectedId: cmd.selected ? cmd.object.id : model.selectedId,
+      };
+    }
     case 'reset':
       return createInitialScene();
   }
