@@ -28,7 +28,7 @@ const colorFor = (p: { handedness: HandPointer['handedness'] }) =>
  *
  * tracking  thin ring with a center dot
  * hovering  larger ring with reticle ticks; an arc fills as the pinch closes;
- *           a "+" instead of the dot when another hand holds the object
+ *           a "+" instead of the dot when pinching would join another hand's grab
  * pinching  (nothing grabbed) dashed ring that tightens with the pinch
  * grabbing  solid core + ring, and a tether to the held object's center
  * released  short expanding ripple
@@ -250,13 +250,14 @@ export function HandCursorOverlay() {
         ctx.restore();
         ring(x, y, r, hovering ? 2.5 : 2, color, (hovering ? 1 : 0.85) * appear);
 
-        // Hovering an object another hand holds alone: a "+" says pinching
-        // here adds this hand to the grab. Otherwise a center dot.
-        const holder = hovering && p.hoverId ? handRuntime.held.get(p.hoverId) : undefined;
+        // Another hand holds an object alone: a "+" says pinching here (on it
+        // or on empty space) adds this hand to the grab. Otherwise a center dot.
+        const joinable = [...handRuntime.held].filter(
+          ([obj, holder]) =>
+            holder !== p.id && !handRuntime.twoHand.some((t) => t.objectId === obj),
+        );
         const canJoin =
-          holder !== undefined &&
-          holder !== p.id &&
-          !handRuntime.twoHand.some((t) => t.objectId === p.hoverId);
+          joinable.length === 1 && (p.hoverId === null || p.hoverId === joinable[0]![0]);
         ctx.save();
         ctx.globalAlpha = appear;
         if (canJoin) {

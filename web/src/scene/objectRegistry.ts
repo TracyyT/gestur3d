@@ -11,9 +11,6 @@ export const objectRegistry = {
   delete(id: string) {
     meshes.delete(id);
   },
-  get(id: string): Object3D | undefined {
-    return meshes.get(id);
-  },
   all(): Object3D[] {
     return Array.from(meshes.values());
   },

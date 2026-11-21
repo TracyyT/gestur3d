@@ -19,7 +19,7 @@ class World {
     for (const [id, p] of Object.entries(objects))
       this.poses.set(id, { position: p, rotation: [0, 0, 0, 1], scale: 1 });
   }
-  query(near?: SceneQuery['near']): SceneQuery {
+  query(): SceneQuery {
     return {
       pick: ({ x, y }) => {
         for (const [id, { position: p, scale }] of this.poses) {
@@ -31,7 +31,6 @@ class World {
       planePoint: ({ x, y }) => [x / 100, y / 100, 0],
       objectPosition: (id) => this.poses.get(id)?.position ?? null,
       objectPose: (id) => this.poses.get(id) ?? null,
-      near,
     };
   }
   apply(cmds: Command[]) {
@@ -86,13 +85,13 @@ const never = () => false;
 const dist = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 /** Engine + world, stepping 33 ms per frame and applying commands. */
-function rig(objects: Record<string, Vec3> = { a: [2, 2, 0] }, near?: SceneQuery['near']) {
+function rig(objects: Record<string, Vec3> = { a: [2, 2, 0] }) {
   const world = new World(objects);
   const engine = new HandInteractionEngine();
   let t = 0;
   const step = (...inputs: PointerInput[]): EngineResult => {
     t += 33;
-    const r = engine.update(t, inputs, world.query(near), never);
+    const r = engine.update(t, inputs, world.query(), never);
     world.apply(r.commands);
     return r;
   };
@@ -251,14 +250,31 @@ describe('two-hand grabs', () => {
     expect(world.pos()[1]).toBeCloseTo(before[1] + 1);
   });
 
-  it('joins from just outside the object when `near` says so', () => {
-    const near: SceneQuery['near'] = ({ x, y }, id, slack) =>
-      id === 'a' && Math.hypot(x - 200, y - 200) <= 60 * slack;
-    const { step } = rig({ a: [2, 2, 0] }, near);
-    step(hand(1, 200, 200, OPEN), hand(2, 400, 400, OPEN));
-    step(hand(1, 200, 200, START), hand(2, 400, 400, OPEN));
-    const r = step(hand(1, 200, 200, HOLD), hand(2, 255, 230, START));
+  it('joins by pinching on empty space, so small objects need no room for both hands', () => {
+    const { world, step } = rig();
+    step(hand(1, 200, 200, OPEN), hand(2, 600, 500, OPEN));
+    step(hand(1, 200, 200, START), hand(2, 600, 500, OPEN));
+    const before = [...world.pos()] as Vec3;
+    const r = step(hand(1, 200, 200, HOLD), hand(2, 600, 500, START));
     expect(r.twoHand).toHaveLength(1);
+    expect(dist(world.pos(), before)).toBeLessThan(1e-9);
+  });
+
+  it('pinching empty space with nothing held by the other hand does nothing', () => {
+    const { step } = rig();
+    step(hand(1, 600, 600, OPEN), hand(2, 700, 500, OPEN));
+    const r = step(hand(1, 600, 600, HOLD), hand(2, 700, 500, START));
+    expect(r.twoHand).toHaveLength(0);
+    expect(r.held.size).toBe(0);
+    expect(r.pointers.find((p) => p.id === 2)!.phase).toBe('pinching');
+  });
+
+  it('a hand outside the interaction box does not join', () => {
+    const { step } = rig();
+    step(hand(1, 200, 200, OPEN), hand(2, 600, 500, OPEN));
+    step(hand(1, 200, 200, START), hand(2, 600, 500, OPEN));
+    const r = step(hand(1, 200, 200, HOLD), hand(2, 600, 500, START, { inBox: false }));
+    expect(r.twoHand).toHaveLength(0);
   });
 
   it('a hand that appears already pinched over a held object does not join', () => {
