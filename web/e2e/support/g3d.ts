@@ -9,6 +9,7 @@ export interface HandKey extends UV {
   pinch: number;
   visible?: boolean;
   size?: number;
+  spread?: number;
 }
 
 export interface G3D {
@@ -41,6 +42,7 @@ export interface G3D {
   playSweep(from: UV, to: UV, handedness?: Handedness): Promise<void>;
   playHold(uv: UV, ms: number, jitter?: number): Promise<void>;
   playTwoHand(s: { right: HandKey[]; left: HandKey[] }): Promise<void>;
+  playHand(keys: HandKey[], handedness?: Handedness): Promise<void>;
 }
 
 declare global {

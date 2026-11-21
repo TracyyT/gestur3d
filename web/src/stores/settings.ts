@@ -28,6 +28,8 @@ export interface SettingsState {
   trackingBackend: TrackingBackendPreference;
   /** Two hands pushed toward / pulled from the camera move the held object in depth. */
   twoHandDepth: boolean;
+  /** An open palm held still opens the radial menu. */
+  palmMenu: boolean;
 }
 
 interface SettingsActions {
@@ -47,6 +49,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   preferredCameraId: null,
   trackingBackend: 'main-thread',
   twoHandDepth: false,
+  palmMenu: true,
 };
 
 export const SETTINGS_STORAGE_KEY = 'gestur3d.settings';

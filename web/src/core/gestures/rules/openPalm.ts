@@ -68,3 +68,25 @@ export function isOpenPalm(world: ArrayLike<number>): boolean {
 
   return dist(L.ThumbTip, L.IndexMcp) > OPEN_PALM.thumbOut * palm;
 }
+
+/**
+ * A closed hand: all four fingertips nearer the wrist than their PIP joints
+ * (world landmarks). Used to close the radial menu.
+ */
+export function isFist(world: ArrayLike<number>): boolean {
+  const d = (a: number, b: number) =>
+    Math.hypot(
+      world[a * 3]! - world[b * 3]!,
+      world[a * 3 + 1]! - world[b * 3 + 1]!,
+      world[a * 3 + 2]! - world[b * 3 + 2]!,
+    );
+  if (!(d(L.Wrist, L.MiddleMcp) > 1e-6)) return false;
+  return (
+    [
+      [L.IndexPip, L.IndexTip],
+      [L.MiddlePip, L.MiddleTip],
+      [L.RingPip, L.RingTip],
+      [L.PinkyPip, L.PinkyTip],
+    ] as const
+  ).every(([pip, tip]) => d(tip, L.Wrist) < d(pip, L.Wrist));
+}

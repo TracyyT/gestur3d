@@ -15,6 +15,8 @@ import { useHandTracking } from '@/features/hands/handTrackingStore';
 import { useHudLayout } from '@/stores/hudLayout';
 import { useScene, type InteractionMode } from '@/stores/scene';
 import { useSettings } from '@/stores/settings';
+import { PalmMenuController } from '@/features/menu/palmMenu';
+import { useMenu } from '@/features/menu/menuStore';
 import { visibleSceneRect } from './framing';
 import { objectRegistry } from './objectRegistry';
 
@@ -32,6 +34,7 @@ export function HandController() {
   const camera = useThree((s) => s.camera);
   const tracker = useMemo(() => new HandTracker(), []);
   const engine = useMemo(() => new HandInteractionEngine(), []);
+  const palmMenu = useMemo(() => new PalmMenuController(), []);
   const queue = useRef<HandFrame[]>([]);
   const display = useRef(new Map<number, { x: number; y: number }>());
   const config = useRef('');
@@ -62,10 +65,11 @@ export function HandController() {
       queue.current = [];
       tracker.reset();
       engine.reset();
+      palmMenu.reset();
       shown.clear();
       handRuntime.reset();
     };
-  }, [source, tracker, engine]);
+  }, [source, tracker, engine, palmMenu]);
 
   // Expose projection for the cursor overlay's tether line and test hooks.
   useEffect(() => {
@@ -129,8 +133,12 @@ export function HandController() {
     };
     const scene = useScene.getState();
     const blocked = (id: string) => handRuntime.mouseDragId === id;
+    // While the radial menu is open, hands that aren't holding anything can't
+    // grab: their pinches belong to the menu.
+    const holding = new Set(handRuntime.held.values());
     const toInputs = (tracks: TrackSnapshot[], edges: boolean): PointerInput[] =>
       tracks.map((t) => {
+        const muted = useMenu.getState().open && !holding.has(t.id);
         const mapped = cameraToScreen(t.anchor, box, rect);
         const tip = cameraToScreen(t.tip, box, rect);
         return {
@@ -141,7 +149,11 @@ export function HandController() {
           inBox: mapped.inBox,
           tip: { x: tip.x, y: tip.y },
           palm: t.palm,
-          pinch: edges ? t.pinch : { ...t.pinch, started: false, ended: false },
+          pinch: muted
+            ? { ...t.pinch, active: false, closed: false, started: false, ended: false }
+            : edges
+              ? t.pinch
+              : { ...t.pinch, started: false, ended: false },
         };
       });
     const run = (t: number, inputs: PointerInput[]) => {
@@ -162,7 +174,9 @@ export function HandController() {
     let result: ReturnType<HandInteractionEngine['update']> | null = null;
     const batch = queue.current.splice(0);
     for (const f of batch) {
-      result = run(f.timestamp, toInputs(tracker.update(f, aspect), true));
+      const frameTracks = tracker.update(f, aspect);
+      result = run(f.timestamp, toInputs(frameTracks, true));
+      palmMenu.update(f.timestamp, frameTracks, result, rect, settings.palmMenu);
       handRuntime.frames.tick(now);
       handRuntime.latency.tick(now, now - (f.captureTime ?? f.timestamp));
     }

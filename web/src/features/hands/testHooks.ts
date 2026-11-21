@@ -39,6 +39,8 @@ export interface HandKey extends UV {
   visible?: boolean;
   /** Synthetic hand size (default 0.12); bigger = closer to the camera. */
   size?: number;
+  /** Finger spread in degrees (0 = relaxed; ~40 = deliberate open palm). */
+  spread?: number;
 }
 
 export interface TwoHandScript {
@@ -135,9 +137,9 @@ function grabRecording({
 
 function handRecording(keys: HandKey[], handedness: Handedness, jitter = 0): Recording {
   return scriptedRecording(
-    keys.map(({ at, u, v, pinch, visible, size }) => {
+    keys.map(({ at, u, v, pinch, visible, size, spread }) => {
       const [cx, cy] = wristAt({ u, v }, pinch, handedness, size);
-      return { at, cx, cy, pinch, visible, size };
+      return { at, cx, cy, pinch, visible, size, spread };
     }),
     { handedness, aspect: ASPECT, jitter },
   );
@@ -199,6 +201,9 @@ export function installTestHooks() {
     playGrab: (script: GrabScript) => play(grabRecording(script), script.speed),
     /** Both hands, each keyframed in scene UV. */
     playTwoHand: (script: TwoHandScript) => play(twoHandRecording(script), script.speed),
+    /** One hand, keyframed in scene UV. */
+    playHand: (keys: HandKey[], handedness: Handedness = 'Right') =>
+      play(handRecording(keys, handedness)),
     /** A pinch closed over empty space, then swept across `to` (must not grab). */
     playSweep: (from: UV, to: UV, handedness: Handedness = 'Right') => {
       const k = (at: number, uv: UV, pinch: number): Keyframe => {

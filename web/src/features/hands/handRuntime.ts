@@ -20,6 +20,8 @@ export const handRuntime = {
    * even when rendering is too slow to sample them.
    */
   twoHandModes: [] as string[],
+  /** Open-palm hold progress (0..1) per hand, for the menu's hold ring. */
+  palmProgress: new Map<number, number>(),
   /** Objects currently hovered by a hand. */
   hovered: new Set<string>(),
   /** Object the mouse is dragging, so hands can't grab it. */
@@ -37,6 +39,7 @@ export const handRuntime = {
     this.twoHand = [];
     this.twoHandModes = [];
     this.hovered.clear();
+    this.palmProgress.clear();
     this.frames.reset();
     this.latency.reset();
   },
