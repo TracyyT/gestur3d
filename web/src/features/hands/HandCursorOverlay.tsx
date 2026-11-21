@@ -27,7 +27,8 @@ const colorFor = (p: { handedness: HandPointer['handedness'] }) =>
  * Screen-space hand cursors, one per hand (cyan = right, violet = left).
  *
  * tracking  thin ring with a center dot
- * hovering  larger ring with reticle ticks; an arc fills as the pinch closes
+ * hovering  larger ring with reticle ticks; an arc fills as the pinch closes;
+ *           a "+" instead of the dot when another hand holds the object
  * pinching  (nothing grabbed) dashed ring that tightens with the pinch
  * grabbing  solid core + ring, and a tether to the held object's center
  * released  short expanding ripple
@@ -249,13 +250,31 @@ export function HandCursorOverlay() {
         ctx.restore();
         ring(x, y, r, hovering ? 2.5 : 2, color, (hovering ? 1 : 0.85) * appear);
 
-        // Center dot.
+        // Hovering an object another hand holds alone: a "+" says pinching
+        // here adds this hand to the grab. Otherwise a center dot.
+        const holder = hovering && p.hoverId ? handRuntime.held.get(p.hoverId) : undefined;
+        const canJoin =
+          holder !== undefined &&
+          holder !== p.id &&
+          !handRuntime.twoHand.some((t) => t.objectId === p.hoverId);
         ctx.save();
         ctx.globalAlpha = appear;
-        ctx.fillStyle = palette.ink1;
-        ctx.beginPath();
-        ctx.arc(x, y, 2, 0, Math.PI * 2);
-        ctx.fill();
+        if (canJoin) {
+          ctx.strokeStyle = palette.ink1;
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(x - 5, y);
+          ctx.lineTo(x + 5, y);
+          ctx.moveTo(x, y - 5);
+          ctx.lineTo(x, y + 5);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = palette.ink1;
+          ctx.beginPath();
+          ctx.arc(x, y, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
         ctx.restore();
 
         if (hovering) {
