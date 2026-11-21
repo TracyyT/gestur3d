@@ -1,11 +1,9 @@
 import type { ObjectKind } from '@/core/interaction/commands';
-import { KIND_LABEL, MAX_OBJECTS, objectLabel } from '@/core/interaction/sceneModel';
+import { KIND_LABEL, MAX_OBJECTS, OBJECT_KINDS, objectLabel } from '@/core/interaction/sceneModel';
 import { useScene } from '@/stores/scene';
 import { Button, Panel, cn } from '@/ui';
 
-const KINDS: ObjectKind[] = ['sphere', 'cube', 'sculpture'];
-
-function KindIcon({ kind }: { kind: ObjectKind }) {
+export function KindIcon({ kind }: { kind: ObjectKind }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.3 } as const;
   return (
     <svg aria-hidden viewBox="0 0 16 16" className="size-3.5">
@@ -20,6 +18,25 @@ function KindIcon({ kind }: { kind: ObjectKind }) {
       )}
       {kind === 'sculpture' && (
         <path d="M4 8c0-5 8-5 8 0s-8 5-8 0zm2 0c0 2.5 4 2.5 4 0S6 5.5 6 8z" {...common} />
+      )}
+      {kind === 'ring' && (
+        <>
+          <circle cx="8" cy="8" r="5.5" {...common} />
+          <circle cx="8" cy="8" r="3.5" {...common} />
+        </>
+      )}
+      {kind === 'pyramid' && <path d="M8 2.5l5.5 10H2.5zM8 2.5l1.5 10" {...common} />}
+      {kind === 'crystal' && <path d="M8 1.5l4 6.5-4 6.5-4-6.5zM4 8h8" {...common} />}
+      {kind === 'capsule' && <rect x="5" y="2" width="6" height="12" rx="3" {...common} />}
+      {kind === 'helix' && (
+        <path d="M5 2c6 2 6 4 0 6s-6 4 0 6M11 2c-6 2-6 4 0 6s6 4 0 6" {...common} />
+      )}
+      {kind === 'gyroscope' && (
+        <>
+          <circle cx="8" cy="8" r="5.5" {...common} />
+          <ellipse cx="8" cy="8" rx="2" ry="5.5" {...common} />
+          <ellipse cx="8" cy="8" rx="5.5" ry="2" {...common} />
+        </>
       )}
     </svg>
   );
@@ -74,17 +91,17 @@ export function ObjectsPanel() {
         <div>
           <p className="mb-2 text-[11px] tracking-[0.16em] text-ink-3 uppercase">Add</p>
           <div className="grid grid-cols-3 gap-2">
-            {KINDS.map((k) => (
+            {OBJECT_KINDS.map((k) => (
               <Button
                 key={k}
                 size="sm"
                 disabled={full}
                 onClick={() => dispatch({ type: 'add', kind: k }, 'ui')}
-                className="rounded-lg"
+                className="h-auto flex-col gap-1 rounded-lg py-2"
                 aria-label={`Add ${KIND_LABEL[k].toLowerCase()}`}
               >
                 <KindIcon kind={k} />
-                <span className="text-[12px]">{KIND_LABEL[k]}</span>
+                <span className="text-[11.5px]">{KIND_LABEL[k]}</span>
               </Button>
             ))}
           </div>

@@ -61,6 +61,22 @@ test.describe('workspace panels', () => {
     ).toHaveCount(4);
   });
 
+  test('all six new object types can be added and render without errors', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto('/workspace');
+    const announcer = page.locator('[aria-live="polite"]').first();
+    for (const kind of ['Ring', 'Pyramid', 'Crystal', 'Capsule', 'Helix', 'Gyroscope']) {
+      await page.getByRole('button', { name: `Add ${kind.toLowerCase()}` }).click();
+      await expect(announcer).toContainText(`${kind} selected`);
+    }
+    await expect(
+      page.getByRole('list', { name: 'Objects in the scene' }).getByRole('listitem'),
+    ).toHaveCount(9);
+    await page.waitForTimeout(500);
+    expect(errors).toEqual([]);
+  });
+
   test('panels can be hidden and shown', async ({ page }) => {
     await page.goto('/workspace');
     const panels = page.getByRole('complementary', { name: 'Workspace panels' });

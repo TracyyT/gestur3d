@@ -37,6 +37,8 @@ const SOURCE: InputSource = 'mouse';
  */
 export function HoloObject({ object, selected, instant, onHoverChange }: Props) {
   const group = useRef<Group>(null);
+  /** Inner group for the kind's idle spin, so the model's rotation stays untouched. */
+  const spin = useRef<Group>(null);
   const body = useRef<Mesh>(null);
   const ring = useRef<Mesh>(null);
   const hovered = useRef(false);
@@ -72,8 +74,8 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
 
   // Register the pickable mesh so hands can raycast against it.
   useEffect(() => {
-    // The body mesh is the group's first child (see JSX below).
-    const mesh = group.current?.children[0];
+    // The body mesh is the spin group's first child (see JSX below).
+    const mesh = spin.current?.children[0];
     if (!mesh) return;
     objectRegistry.set(object.id, mesh);
     return () => objectRegistry.delete(object.id);
@@ -99,6 +101,11 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
         handHeld ? 0.03 : 0.1,
         delta,
       );
+    }
+
+    // Idle spin, paused while held or dragged, and with reduced motion.
+    if (kind.spin && spin.current && !instant && !handHeld && !drag.current) {
+      spin.current.rotation.y += kind.spin * delta;
     }
 
     const m = body.current?.material as ShaderMaterial | undefined;
@@ -197,34 +204,36 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
   return (
     <>
       <group ref={group}>
-        <mesh
-          ref={body}
-          material={material}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-          onWheel={onWheel}
-          onPointerOver={(e) => {
-            e.stopPropagation();
-            setHover(true);
-          }}
-          onPointerOut={() => setHover(false)}
-        >
-          <primitive object={kindBody} attach="geometry" />
-        </mesh>
-        {edges && (
-          <lineSegments geometry={edges} raycast={() => null}>
-            <lineBasicMaterial
-              color={kind.color}
-              transparent
-              opacity={selected ? 0.55 : 0.22}
-              blending={AdditiveBlending}
-              depthWrite={false}
-              toneMapped={false}
-            />
-          </lineSegments>
-        )}
+        <group ref={spin}>
+          <mesh
+            ref={body}
+            material={material}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            onWheel={onWheel}
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              setHover(true);
+            }}
+            onPointerOut={() => setHover(false)}
+          >
+            <primitive object={kindBody} attach="geometry" />
+          </mesh>
+          {edges && (
+            <lineSegments geometry={edges} raycast={() => null}>
+              <lineBasicMaterial
+                color={kind.color}
+                transparent
+                opacity={selected ? 0.55 : 0.22}
+                blending={AdditiveBlending}
+                depthWrite={false}
+                toneMapped={false}
+              />
+            </lineSegments>
+          )}
+        </group>
       </group>
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} visible={false} raycast={() => null}>
         <ringGeometry args={[0.72, 0.73, 128]} />
