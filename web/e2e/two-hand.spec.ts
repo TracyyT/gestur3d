@@ -17,6 +17,8 @@ interface Sample {
   chip: string | null;
   limit: string | null;
   hud: string | null;
+  /** Fingertip (pinch point) separation in px and angle (screen CCW, radians), during a two-hand grab. */
+  span: { d: number; angle: number } | null;
 }
 
 async function open(page: Page, width: number, height: number, panels: boolean) {
@@ -68,7 +70,17 @@ async function playSampled(page: Page, right: HandKey[], left: HandKey[]): Promi
         const th = g.twoHand();
         const chip = document.querySelector<HTMLElement>('[data-testid="two-hand-readout"]');
         const shown = chip && chip.style.opacity === '1';
+        const ps = th[0] ? g.pointers().filter((p) => th[0]!.pointerIds.includes(p.id)) : [];
+        const [pa, pb] = ps.sort((x, y) => x.id - y.id);
+        const span =
+          pa?.tip && pb?.tip
+            ? {
+                d: Math.hypot(pb.tip.x - pa.tip.x, pb.tip.y - pa.tip.y),
+                angle: Math.atan2(-(pb.tip.y - pa.tip.y), pb.tip.x - pa.tip.x),
+              }
+            : null;
         out.push({
+          span,
           hud: document.querySelector('[data-testid="interaction-mode"]')?.textContent ?? null,
           chip: shown ? chip.textContent : null,
           limit: shown ? (chip.dataset.limit ?? null) : null,
@@ -90,6 +102,32 @@ async function playSampled(page: Page, right: HandKey[], left: HandKey[]): Promi
     },
     [right, left] as const,
   );
+}
+
+/**
+ * Fingertip spans while both hands drove the object, from the first frame of
+ * the grab (closest to its snapshot) up to `until` (script ms), so fingers
+ * opening on release don't count.
+ */
+function spans(samples: Sample[], until: number) {
+  return samples.filter((s) => s.span && s.mode === 'two' && s.t <= until).map((s) => s.span!);
+}
+
+/** Scale two-hand grabs should reach: fingertip spread ratio, less the 3% soft dead zone. */
+function expectedScale(samples: Sample[], until: number) {
+  const s = spans(samples, until);
+  return Math.exp(Math.log(s.at(-1)!.d / s[0]!.d) - 0.03);
+}
+
+/** Roll two-hand grabs should reach, degrees: fingertip line turn, less the 2° dead zone. */
+function expectedRollDeg(samples: Sample[], until: number) {
+  const s = spans(samples, until);
+  let turn = 0;
+  for (let i = 1; i < s.length; i++) {
+    const d = s[i]!.angle - s[i - 1]!.angle;
+    turn += Math.atan2(Math.sin(d), Math.cos(d));
+  }
+  return Math.abs((turn * 180) / Math.PI) - 2;
 }
 
 /** Largest on-screen move of the cube between samples whose script times fall in [from, to]. */
@@ -125,10 +163,13 @@ test.describe('two-hand grab', () => {
       await open(page, w, h, panels);
       const c = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
       const at = await px(page);
-      const R = at(40, 0, c);
-      const L = at(-40, 0, c);
-      const R2 = at(80, 0, c);
-      const L2 = at(-80, 0, c);
+      // Right grabs near the cube's center (it's small at 950 px); left pinches
+      // on empty floor below-left (clear of the sphere). Then both spread to
+      // twice the distance around the same midpoint.
+      const R = at(20, 0, c);
+      const L = at(-100, 120, c);
+      const R2 = at(80, -60, c);
+      const L2 = at(-160, 180, c);
       const before = await cube(page);
       // Right grabs (0.4–0.55 s); left joins at 1.0–1.15 s; both hold still to
       // 1.6 s; spread to 2.4 s; hold to 3.0 s; both let go.
@@ -160,10 +201,14 @@ test.describe('two-hand grab', () => {
       // Still hands around the join: the cube didn't move.
       expect(maxDrift(samples, 800, 1550)).toBeLessThanOrEqual(1);
       const after = await cube(page);
-      // Spreading 2× scales about 2× (soft dead zone takes ~3%).
-      expect(after.scale / before.scale).toBeGreaterThan(1.85);
-      expect(after.scale / before.scale).toBeLessThan(2.05);
-      // Midpoint didn't move, so the cube stayed centered under the hands.
+      // Spreading scales by the fingertips' spread ratio (the knuckle
+      // cursors went 80 → 160 px apart; fingertips are closer together).
+      const want = expectedScale(samples, 3000);
+      expect(want).toBeGreaterThan(1.8);
+      // The first sample can land a frame or two after the snapshot while the
+      // second pinch is still closing, so allow 5%.
+      expect(Math.abs(after.scale / before.scale - want) / want).toBeLessThan(0.05);
+      // The hands' midpoint didn't move, and scaling is in place: the cube stayed put.
       const end = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
       const r = await page.evaluate(() => window.__G3D__.sceneRect());
       expect(Math.abs(end.u - c.u) * r.width).toBeLessThan(6);
@@ -211,8 +256,9 @@ test.describe('two-hand grab', () => {
     expect(samples.some((s) => s.two === 1)).toBe(true);
     expect(maxDrift(samples, 800, 1350)).toBeLessThanOrEqual(1);
     const after = await cube(page);
-    expect(after.scale / before.scale).toBeGreaterThan(1.3);
-    expect(after.scale / before.scale).toBeLessThan(1.47);
+    const want = expectedScale(samples, 2600);
+    expect(want).toBeGreaterThan(1.25);
+    expect(Math.abs(after.scale / before.scale - want) / want).toBeLessThan(0.05);
   });
 
   test('spreading far past the limit stops at 3× and flags the limit', async ({ page }) => {
@@ -251,46 +297,49 @@ test.describe('two-hand grab', () => {
     const c = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
     const at = await px(page);
     const before = await cube(page);
-    // Hands 100 px apart, horizontal, then turned 90° counter-clockwise on screen.
+    // Hands 180 px apart, horizontal, then turned 90° counter-clockwise on screen.
     const steps = 6;
     const right: HandKey[] = [
-      { at: 0, ...at(50, 0, c), pinch: 0 },
-      { at: 300, ...at(50, 0, c), pinch: 0 },
-      { at: 450, ...at(50, 0, c), pinch: 1 },
+      { at: 0, ...at(90, 0, c), pinch: 0 },
+      { at: 300, ...at(90, 0, c), pinch: 0 },
+      { at: 450, ...at(90, 0, c), pinch: 1 },
     ];
     const left: HandKey[] = [
-      { at: 0, ...at(-50, 0, c), pinch: 0 },
-      { at: 700, ...at(-50, 0, c), pinch: 0 },
-      { at: 850, ...at(-50, 0, c), pinch: 1 },
-      { at: 1200, ...at(-50, 0, c), pinch: 1 },
+      { at: 0, ...at(-90, 0, c), pinch: 0 },
+      { at: 700, ...at(-90, 0, c), pinch: 0 },
+      { at: 850, ...at(-90, 0, c), pinch: 1 },
+      { at: 1200, ...at(-90, 0, c), pinch: 1 },
     ];
-    right.push({ at: 1200, ...at(50, 0, c), pinch: 1 });
+    right.push({ at: 1200, ...at(90, 0, c), pinch: 1 });
     for (let i = 1; i <= steps; i++) {
       const a = (i / steps) * (Math.PI / 2);
       const t = 1200 + i * 150;
       // Screen y grows downward: counter-clockwise means up for the right hand.
-      right.push({ at: t, ...at(50 * Math.cos(a), -50 * Math.sin(a), c), pinch: 1 });
-      left.push({ at: t, ...at(-50 * Math.cos(a), 50 * Math.sin(a), c), pinch: 1 });
+      right.push({ at: t, ...at(90 * Math.cos(a), -90 * Math.sin(a), c), pinch: 1 });
+      left.push({ at: t, ...at(-90 * Math.cos(a), 90 * Math.sin(a), c), pinch: 1 });
     }
     const end = 1200 + steps * 150;
     right.push(
-      { at: end + 600, ...at(0, -50, c), pinch: 1 },
-      { at: end + 750, ...at(0, -50, c), pinch: 0 },
-      { at: end + 1000, ...at(0, -50, c), pinch: 0 },
+      { at: end + 600, ...at(0, -90, c), pinch: 1 },
+      { at: end + 750, ...at(0, -90, c), pinch: 0 },
+      { at: end + 1000, ...at(0, -90, c), pinch: 0 },
     );
     left.push(
-      { at: end + 600, ...at(0, 50, c), pinch: 1 },
-      { at: end + 750, ...at(0, 50, c), pinch: 0 },
-      { at: end + 1000, ...at(0, 50, c), pinch: 0 },
+      { at: end + 600, ...at(0, 90, c), pinch: 1 },
+      { at: end + 750, ...at(0, 90, c), pinch: 0 },
+      { at: end + 1000, ...at(0, 90, c), pinch: 0 },
     );
-    await playSampled(page, right, left);
+    const samples = await playSampled(page, right, left);
     const after = await cube(page);
     const turned = angleDeg(before.rotation, after.rotation);
-    // 90° less the 2° soft dead zone.
-    expect(turned).toBeGreaterThan(84);
-    expect(turned).toBeLessThan(93);
-    expect(after.scale / before.scale).toBeGreaterThan(0.95);
-    expect(after.scale / before.scale).toBeLessThan(1.05);
+    // The fingertip line's turn (the knuckle cursors turned 90°), less the dead zone.
+    const want = expectedRollDeg(samples, end + 600);
+    expect(want).toBeGreaterThan(80);
+    expect(Math.abs(turned - want)).toBeLessThan(3);
+    // Scale follows the fingertip spread (synthetic hands don't turn their
+    // fingers with the wheel, so it changes a little).
+    const scaleWant = expectedScale(samples, end + 600);
+    expect(Math.abs(after.scale / before.scale - scaleWant) / scaleWant).toBeLessThan(0.05);
   });
 
   test('one hand letting go leaves the other holding it, without a jump', async ({ page }) => {

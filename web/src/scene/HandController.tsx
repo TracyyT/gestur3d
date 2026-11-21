@@ -131,12 +131,14 @@ export function HandController() {
     const toInputs = (tracks: TrackSnapshot[], edges: boolean): PointerInput[] =>
       tracks.map((t) => {
         const mapped = cameraToScreen(t.anchor, box, rect);
+        const tip = cameraToScreen(t.tip, box, rect);
         return {
           id: t.id,
           handedness: t.handedness,
           status: t.status,
           screen: { x: mapped.x, y: mapped.y },
           inBox: mapped.inBox,
+          tip: { x: tip.x, y: tip.y },
           pinch: edges ? t.pinch : { ...t.pinch, started: false, ended: false },
         };
       });

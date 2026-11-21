@@ -13,7 +13,12 @@ export interface HandKey extends UV {
 export interface G3D {
   objects(): Array<{ id: string; position: Vec3; rotation: Quat; scale: number }>;
   selectedId(): string | null;
-  pointers(): Array<{ phase: string; grabbedId: string | null }>;
+  pointers(): Array<{
+    id: number;
+    phase: string;
+    grabbedId: string | null;
+    tip?: { x: number; y: number };
+  }>;
   twoHand(): Array<{ mode: string; pointerIds: [number, number] }>;
   objectUV(id: string): UV | null;
   scriptTime(): number | null;

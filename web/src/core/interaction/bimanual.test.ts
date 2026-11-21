@@ -208,6 +208,32 @@ describe('BimanualGrip', () => {
     expect(quatAngleBetween(r.rotation, START.rotation)).toBeLessThan(0.01);
   });
 
+  it('measures scale and roll from the span points when given, translation from the grips', () => {
+    const spanA: Vec3 = [-0.5, 0, 0];
+    const spanB: Vec3 = [0.5, 0, 0];
+    const g = new BimanualGrip(START, L, R, VIEW, 0, EXACT, [spanA, spanB]);
+    // Grips (knuckles) stay 2 apart; fingertips spread from 1 to 2 apart.
+    const r = g.update([-1, 0.5, 0], [1, 0.5, 0], 33, [
+      [-1, 0.5, 0],
+      [1, 0.5, 0],
+    ]);
+    expect(r.scale).toBeCloseTo(2);
+    closeVec(r.position, [0, 0.75, 0]);
+  });
+
+  it('fingertips coming together hold scale instead of collapsing it', () => {
+    const g = new BimanualGrip(START, L, R, VIEW, 0, EXACT, [
+      [-0.5, 0, 0],
+      [0.5, 0, 0],
+    ]);
+    const r = g.update(L, R, 33, [
+      [-0.05, 0, 0],
+      [0.05, 0, 0],
+    ]);
+    expect(r.holding).toBe(true);
+    expect(r.scale).toBe(1);
+  });
+
   it('rebase keeps the current pose', () => {
     const g = new BimanualGrip(START, L, R, VIEW, 0, EXACT);
     const moved = g.update(...hands([0.5, 0.5, 0], 1.5, 0.7), 33);
