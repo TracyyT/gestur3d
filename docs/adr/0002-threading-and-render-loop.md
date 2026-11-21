@@ -1,6 +1,6 @@
 # ADR-0002: Threading and render-loop data flow
 
-- Status: accepted (M1), worker move planned for M2
+- Status: accepted (M1), amended in M2: main thread stays the default
 - Date: 2026-11-20
 
 ## Context
@@ -21,3 +21,7 @@ Hand detection (MediaPipe, roughly 5–15 ms a frame) and 3D rendering with bloo
 
 - M2 swaps the source implementation without touching the UI or the scene.
 - The worker adds message-passing latency, so the M2 benchmarks compare main-thread vs worker end-to-end latency before it becomes the default.
+
+## M2 result
+
+Both sources shipped. On the reference Mac (docs/benchmarks.md) the main thread was faster: 11–12 ms inference vs 15–19 ms, and 15–16 ms latency vs 22–26 ms, with rendering at the 120 Hz cap either way. The frame copy into an `ImageBitmap` and the worker round trip cost more than they saved. So the default is the main thread. The worker remains a setting, and saved settings still on the old "auto" default move to the main thread. M6 re-checks this on slower hardware, where sharing the render thread may matter more.

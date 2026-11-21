@@ -20,7 +20,11 @@ export interface SettingsState {
   mouseKeyboardEnabled: boolean;
   showDebugOverlay: boolean;
   preferredCameraId: string | null;
-  /** Where hand detection runs. Auto = worker, falling back to the main thread. */
+  /**
+   * Where hand detection runs. Main thread by default: on the reference Mac it
+   * measured faster than the worker (docs/benchmarks.md). Auto = worker, falling
+   * back to the main thread.
+   */
   trackingBackend: TrackingBackendPreference;
 }
 
@@ -39,7 +43,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   mouseKeyboardEnabled: true,
   showDebugOverlay: false,
   preferredCameraId: null,
-  trackingBackend: 'auto',
+  trackingBackend: 'main-thread',
 };
 
 export const SETTINGS_STORAGE_KEY = 'gestur3d.settings';
@@ -53,8 +57,9 @@ export const useSettings = create<SettingsState & SettingsActions>()(
     }),
     {
       name: SETTINGS_STORAGE_KEY,
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
+      migrate: (persisted, version) => migrateSettings(persisted, version),
       partialize: ({ set: _set, reset: _reset, ...state }) => state,
     },
   ),
@@ -65,4 +70,14 @@ export function resolveReducedMotion(pref: ReducedMotionPreference, osPrefersRed
   if (pref === 'on') return true;
   if (pref === 'off') return false;
   return osPrefersReduced;
+}
+
+/**
+ * v1 → v2: the default backend changed from "auto" (worker) to the main thread.
+ * Users still on the old default move with it; an explicit "worker" is kept.
+ */
+export function migrateSettings(persisted: unknown, version: number) {
+  const state = { ...(persisted as Partial<SettingsState>) };
+  if (version < 2 && state.trackingBackend === 'auto') state.trackingBackend = 'main-thread';
+  return state as SettingsState & SettingsActions;
 }

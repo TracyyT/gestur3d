@@ -47,16 +47,20 @@ Replayed pinch-grabs of the cube to scene position (0.25, 0.30), through tracker
 
 ### On the reference MacBook Pro
 
-| Metric                                 | Worker | Main thread | Notes              |
-| -------------------------------------- | ------ | ----------- | ------------------ |
-| Render FPS while tracking 1 hand, idle |        |             | HUD                |
-| Render FPS while dragging with a hand  |        |             | HUD                |
-| Detection rate                         |        |             | Tracking panel     |
-| Inference time                         |        |             | Tracking panel     |
-| Capture → render latency               |        |             | Tracking panel     |
-| Cursor jitter, still hand              |        |             | Recorded landmarks |
+Measured 2026-11-20 on the reference machine with both hands in view, grabbing and moving objects for about 20 s per run, GPU delegate in both. Ranges are the Tracking panel and HUD values sampled every 0.5 s.
 
-Not measured yet. The backend can be pinned under _Hand tracking → Runs in_ to fill both columns.
+| Metric                                | Worker            | Main thread   | Notes            |
+| ------------------------------------- | ----------------- | ------------- | ---------------- |
+| Render FPS while tracking, idle       | 120 fps           | 118–121 fps   | HUD, display cap |
+| Render FPS while dragging with a hand | 120 fps           | 118–121 fps   | HUD, display cap |
+| Detection rate                        | 28–30 fps (24–26) | 29–31 fps     | Tracking panel   |
+| Inference time, 2 hands               | 15–19 ms          | 11–12 ms      | Tracking panel   |
+| Capture → render latency              | 22–26 ms (29)     | 15–16 ms (18) | Tracking panel   |
+| Cursor jitter, still hand             |                   |               | Not measured yet |
+
+Values in brackets are occasional dips or peaks. The worker run used a production build (`pnpm preview`); the main-thread run used the dev server, which can only be slower, so the gap is if anything understated.
+
+**Decision:** the main thread is the default (see ADR-0002). It was about 5 ms faster per frame and about 8 ms lower in latency, and rendering stayed at the 120 Hz cap, so the worker's benefit of keeping detection off the render thread didn't show up on this machine. The worker stays available under _Hand tracking → Runs in_ and is worth re-checking on slower machines in M6.
 
 ### Bundle (measured 2026-11-20, production build)
 
