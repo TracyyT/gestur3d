@@ -10,6 +10,8 @@ const FADE_IN_MS = 220;
 const LOST_FADE_MS = 300;
 /** Matches the tracker's lost-hand grace period. */
 const GRACE_MS = 300;
+/** Turns smaller than this (radians) don't draw an arc. */
+const MIN_ROLL = (2 * Math.PI) / 180;
 
 interface Ghost {
   x: number;
@@ -32,12 +34,14 @@ const colorFor = (p: { handedness: HandPointer['handedness'] }) =>
  * lost      dashed ghost that fades over the grace period
  *
  * Two-hand grab: a glowing line between the hands with a dot at the pivot
- * (their midpoint) instead of the tethers. If one hand is lost, its half of
+ * (their midpoint) instead of the tethers, an arc showing the turn since the
+ * grab started, and a chip with the scale and angle (amber at a scale limit). If one hand is lost, its half of
  * the line turns grey and dashed, and its ghost ring shrinks over the grace
  * period.
  */
 export function HandCursorOverlay() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chipRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
 
   useEffect(() => {
@@ -79,6 +83,8 @@ export function HandCursorOverlay() {
     };
 
     const lostSince = new Map<number, number>();
+    const chip = chipRef.current;
+    let chipText = '';
 
     /** Line between the two hands of each two-hand grab, with the pivot dot. */
     const drawTwoHandLinks = (now: number) => {
@@ -128,7 +134,49 @@ export function HandCursorOverlay() {
         ctx.fill();
         ctx.restore();
         ring(mx, my, 8, 1.25, palette.ink1, t.mode === 'two' ? 0.6 : 0.3);
+
+        // Turn since the grab started: an arc from the starting line angle to
+        // the current one (screen y points down, so CCW roll is a smaller angle).
+        if (t.mode === 'two' && Math.abs(t.roll) > MIN_ROLL) {
+          const lineAngle = Math.atan2(b.screen.y - a.screen.y, b.screen.x - a.screen.x);
+          ctx.save();
+          ctx.globalAlpha = 0.75;
+          ctx.strokeStyle = palette.ink1;
+          ctx.lineWidth = 1.5;
+          ctx.lineCap = 'round';
+          // One arc on each side of the pivot, like the rim of a wheel.
+          for (const side of [0, Math.PI]) {
+            ctx.beginPath();
+            ctx.arc(mx, my, 30, lineAngle + side + t.roll, lineAngle + side, t.roll > 0);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
       }
+      updateChip();
+    };
+
+    /** Scale and angle readout for the first two-hand grab, above its pivot. */
+    const updateChip = () => {
+      if (!chip) return;
+      const t = handRuntime.twoHand.find((x) => x.mode === 'two');
+      const a = t && handRuntime.pointers.find((p) => p.id === t.pointerIds[0]);
+      const b = t && handRuntime.pointers.find((p) => p.id === t.pointerIds[1]);
+      if (!t || !a || !b) {
+        if (chip.style.opacity !== '0') chip.style.opacity = '0';
+        return;
+      }
+      const mx = (a.screen.x + b.screen.x) / 2;
+      const my = (a.screen.y + b.screen.y) / 2;
+      const deg = Math.round((Math.abs(t.roll) * 180) / Math.PI);
+      const text = `${t.scale.toFixed(2)}× · ${deg}°`;
+      if (text !== chipText) {
+        chip.textContent = text;
+        chipText = text;
+      }
+      chip.dataset.limit = String(t.atLimit);
+      chip.style.opacity = '1';
+      chip.style.transform = `translate(${mx}px, ${my - 46}px) translate(-50%, -50%)`;
     };
 
     const draw = () => {
@@ -264,10 +312,19 @@ export function HandCursorOverlay() {
   }, [reduced]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden
-      className="pointer-events-none absolute inset-0 z-10 size-full"
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-10 size-full"
+      />
+      <div
+        ref={chipRef}
+        aria-hidden
+        data-testid="two-hand-readout"
+        style={{ opacity: 0 }}
+        className="glass text-ink-1 data-[limit=true]:text-signal-warn data-[limit=true]:border-signal-warn/40 pointer-events-none absolute top-0 left-0 z-10 rounded-full px-2.5 py-1 font-mono text-xs tabular-nums transition-[opacity,color] duration-150"
+      />
+    </>
   );
 }

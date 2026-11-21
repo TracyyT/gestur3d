@@ -14,6 +14,8 @@ interface Sample {
   scale: number;
   two: number;
   mode: string | null;
+  chip: string | null;
+  limit: string | null;
 }
 
 async function open(page: Page, width: number, height: number, panels: boolean) {
@@ -63,7 +65,11 @@ async function playSampled(page: Page, right: HandKey[], left: HandKey[]): Promi
         const uv = g.objectUV('obj-2')!;
         const o = g.objects().find((x) => x.id === 'obj-2')!;
         const th = g.twoHand();
+        const chip = document.querySelector<HTMLElement>('[data-testid="two-hand-readout"]');
+        const shown = chip && chip.style.opacity === '1';
         out.push({
+          chip: shown ? chip.textContent : null,
+          limit: shown ? (chip.dataset.limit ?? null) : null,
           // Script time of the last frame the engine processed, so windows
           // line up with the script even when rendering stalls.
           t: g.scriptTime() ?? -1,
@@ -160,13 +166,47 @@ test.describe('two-hand grab', () => {
       const r = await page.evaluate(() => window.__G3D__.sceneRect());
       expect(Math.abs(end.u - c.u) * r.width).toBeLessThan(6);
       expect(Math.abs(end.v - c.v) * r.height).toBeLessThan(6);
-      // Released: nothing held.
+      // The readout showed scale and angle while both hands held it.
+      expect(samples.some((s) => /^\d\.\d\d× · \d+°$/.test(s.chip ?? ''))).toBe(true);
+      // Released: nothing held, readout hidden.
       expect(await page.evaluate(() => window.__G3D__.twoHand().length)).toBe(0);
+      await expect(page.getByTestId('two-hand-readout')).toHaveCSS('opacity', '0');
       expect(await page.evaluate(() => window.__G3D__.pointers().some((p) => p.grabbedId))).toBe(
         false,
       );
     });
   }
+
+  test('spreading far past the limit stops at 3× and flags the limit', async ({ page }) => {
+    await open(page, 1440, 900, true);
+    const c = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
+    const at = await px(page);
+    const right: HandKey[] = [
+      { at: 0, ...at(40, 0, c), pinch: 0 },
+      { at: 400, ...at(40, 0, c), pinch: 0 },
+      { at: 550, ...at(40, 0, c), pinch: 1 },
+      { at: 1300, ...at(40, 0, c), pinch: 1 },
+      { at: 2300, ...at(240, 0, c), pinch: 1 },
+      { at: 2800, ...at(240, 0, c), pinch: 1 },
+      { at: 2950, ...at(240, 0, c), pinch: 0 },
+      { at: 3300, ...at(240, 0, c), pinch: 0 },
+    ];
+    const left: HandKey[] = [
+      { at: 0, ...at(-40, 0, c), pinch: 0 },
+      { at: 900, ...at(-40, 0, c), pinch: 0 },
+      { at: 1050, ...at(-40, 0, c), pinch: 1 },
+      { at: 1300, ...at(-40, 0, c), pinch: 1 },
+      { at: 2300, ...at(-240, 0, c), pinch: 1 },
+      { at: 2800, ...at(-240, 0, c), pinch: 1 },
+      { at: 2950, ...at(-240, 0, c), pinch: 0 },
+      { at: 3300, ...at(-240, 0, c), pinch: 0 },
+    ];
+    const samples = await playSampled(page, right, left);
+    const after = await cube(page);
+    expect(after.scale).toBeGreaterThan(2.95);
+    expect(after.scale).toBeLessThanOrEqual(3);
+    expect(samples.some((s) => s.limit === 'true')).toBe(true);
+  });
 
   test('turning the hands like a wheel rolls the cube about 90°', async ({ page }) => {
     await open(page, 1440, 900, true);
