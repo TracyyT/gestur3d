@@ -16,6 +16,7 @@ interface Sample {
   mode: string | null;
   chip: string | null;
   limit: string | null;
+  hud: string | null;
 }
 
 async function open(page: Page, width: number, height: number, panels: boolean) {
@@ -68,6 +69,7 @@ async function playSampled(page: Page, right: HandKey[], left: HandKey[]): Promi
         const chip = document.querySelector<HTMLElement>('[data-testid="two-hand-readout"]');
         const shown = chip && chip.style.opacity === '1';
         out.push({
+          hud: document.querySelector('[data-testid="interaction-mode"]')?.textContent ?? null,
           chip: shown ? chip.textContent : null,
           limit: shown ? (chip.dataset.limit ?? null) : null,
           // Script time of the last frame the engine processed, so windows
@@ -166,6 +168,9 @@ test.describe('two-hand grab', () => {
       const r = await page.evaluate(() => window.__G3D__.sceneRect());
       expect(Math.abs(end.u - c.u) * r.width).toBeLessThan(6);
       expect(Math.abs(end.v - c.v) * r.height).toBeLessThan(6);
+      // The HUD said so, and went back to Selected after release.
+      expect(samples.some((s) => s.hud === 'Two-hand')).toBe(true);
+      expect(samples.at(-1)!.hud).toBe('Selected');
       // The readout showed scale and angle while both hands held it.
       expect(samples.some((s) => /^\d\.\d\d× · \d+°$/.test(s.chip ?? ''))).toBe(true);
       // Released: nothing held, readout hidden.

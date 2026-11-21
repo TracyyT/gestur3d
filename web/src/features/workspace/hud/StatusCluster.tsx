@@ -9,6 +9,7 @@ const MODE_LABEL: Record<InteractionMode, string> = {
   moving: 'Moving',
   rotating: 'Rotating',
   scaling: 'Scaling',
+  twoHand: 'Two-hand',
 };
 
 const read = () => renderStats.snapshot();
@@ -53,7 +54,9 @@ export function StatusCluster() {
             mode === 'idle' ? 'bg-ink-3' : 'bg-holo-cyan shadow-[0_0_8px_var(--color-holo-cyan)]',
           )}
         />
-        <span className="text-ink-1">{MODE_LABEL[mode]}</span>
+        <span className="text-ink-1" data-testid="interaction-mode">
+          {MODE_LABEL[mode]}
+        </span>
         {source && mode !== 'idle' && <span className="text-ink-3 capitalize">· {source}</span>}
       </div>
     </div>
