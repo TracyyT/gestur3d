@@ -8,6 +8,8 @@ import { handRuntime } from './handRuntime';
 const RIPPLE_MS = 450;
 const FADE_IN_MS = 220;
 const LOST_FADE_MS = 300;
+/** Matches the tracker's lost-hand grace period. */
+const GRACE_MS = 300;
 
 interface Ghost {
   x: number;
@@ -28,6 +30,11 @@ const colorFor = (p: { handedness: HandPointer['handedness'] }) =>
  * grabbing  solid core + ring, and a tether to the held object's center
  * released  short expanding ripple
  * lost      dashed ghost that fades over the grace period
+ *
+ * Two-hand grab: a glowing line between the hands with a dot at the pivot
+ * (their midpoint) instead of the tethers. If one hand is lost, its half of
+ * the line turns grey and dashed, and its ghost ring shrinks over the grace
+ * period.
  */
 export function HandCursorOverlay() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -71,6 +78,59 @@ export function HandCursorOverlay() {
       ctx.restore();
     };
 
+    const lostSince = new Map<number, number>();
+
+    /** Line between the two hands of each two-hand grab, with the pivot dot. */
+    const drawTwoHandLinks = (now: number) => {
+      for (const t of handRuntime.twoHand) {
+        const a = handRuntime.pointers.find((p) => p.id === t.pointerIds[0]);
+        const b = handRuntime.pointers.find((p) => p.id === t.pointerIds[1]);
+        if (!a || !b) continue;
+        const mx = (a.screen.x + b.screen.x) / 2;
+        const my = (a.screen.y + b.screen.y) / 2;
+        for (const p of [a, b]) {
+          const lost = p.phase === 'lost';
+          ctx.save();
+          if (lost) {
+            ctx.globalAlpha = 0.5;
+            ctx.strokeStyle = palette.ink3;
+            ctx.setLineDash([4, 5]);
+            ctx.lineWidth = 1.25;
+          } else {
+            const color = colorFor(p);
+            ctx.globalAlpha = t.mode === 'two' ? 0.85 : 0.6;
+            ctx.strokeStyle = color;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = reduced ? 0 : 10;
+            ctx.lineWidth = 1.75;
+          }
+          ctx.beginPath();
+          ctx.moveTo(mx, my);
+          ctx.lineTo(p.screen.x, p.screen.y);
+          ctx.stroke();
+          ctx.restore();
+
+          // A lost hand's ring shrinks over the grace period.
+          if (lost) {
+            if (!lostSince.has(p.id)) lostSince.set(p.id, now);
+            const k = Math.max(0, 1 - (now - lostSince.get(p.id)!) / GRACE_MS);
+            if (k > 0) ring(p.screen.x, p.screen.y, 4 + 12 * k, 1.5, palette.ink2, 0.8, [2, 3]);
+          }
+        }
+        // Pivot dot.
+        ctx.save();
+        ctx.globalAlpha = 0.95;
+        ctx.fillStyle = palette.ink1;
+        ctx.shadowColor = palette.cyan;
+        ctx.shadowBlur = reduced ? 0 : 12;
+        ctx.beginPath();
+        ctx.arc(mx, my, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ring(mx, my, 8, 1.25, palette.ink1, t.mode === 'two' ? 0.6 : 0.3);
+      }
+    };
+
     const draw = () => {
       raf = requestAnimationFrame(draw);
       const now = performance.now();
@@ -81,6 +141,9 @@ export function HandCursorOverlay() {
       if (canvas.height !== Math.round(h * dpr)) canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
+
+      const twoHandIds = new Set(handRuntime.twoHand.flatMap((t) => t.pointerIds));
+      drawTwoHandLinks(now);
 
       const live = new Set<number>();
       for (const p of handRuntime.pointers) {
@@ -94,6 +157,7 @@ export function HandCursorOverlay() {
           if (!ghosts.has(p.id)) ghosts.set(p.id, { x, y, handedness: p.handedness, since: now });
           continue;
         }
+        if (lostSince.has(p.id)) lostSince.delete(p.id);
         ghosts.delete(p.id);
 
         ctx.save();
@@ -101,7 +165,7 @@ export function HandCursorOverlay() {
 
         if (p.phase === 'grabbing') {
           const obj = useScene.getState().objects.find((o) => o.id === p.grabbedId);
-          const anchor = obj && handRuntime.project?.(obj.position);
+          const anchor = !twoHandIds.has(p.id) && obj && handRuntime.project?.(obj.position);
           if (anchor) {
             const grad = ctx.createLinearGradient(x, y, anchor.x, anchor.y);
             grad.addColorStop(0, color);
@@ -189,9 +253,11 @@ export function HandCursorOverlay() {
           if (t >= 1) ghosts.delete(id);
           continue;
         }
+        if (twoHandIds.has(id)) continue;
         ring(g.x, g.y, 14, 1.5, colorFor(g), 0.6 * (1 - t), [2, 4]);
       }
       for (const id of firstSeen.keys()) if (!live.has(id)) firstSeen.delete(id);
+      for (const id of lostSince.keys()) if (!live.has(id)) lostSince.delete(id);
     };
     draw();
     return () => cancelAnimationFrame(raf);
