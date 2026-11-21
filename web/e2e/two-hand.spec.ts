@@ -17,8 +17,9 @@ interface Sample {
   chip: string | null;
   limit: string | null;
   hud: string | null;
-  /** Fingertip (pinch point) separation in px and angle (screen CCW, radians), during a two-hand grab. */
-  span: { d: number; angle: number } | null;
+  /** Engine's raw fingertip spread and turn since the two-hand snapshot. */
+  spread: number | null;
+  turn: number | null;
 }
 
 async function open(
@@ -81,17 +82,9 @@ async function playSampled(page: Page, right: HandKey[], left: HandKey[]): Promi
         const th = g.twoHand();
         const chip = document.querySelector<HTMLElement>('[data-testid="two-hand-readout"]');
         const shown = chip && chip.style.opacity === '1';
-        const ps = th[0] ? g.pointers().filter((p) => th[0]!.pointerIds.includes(p.id)) : [];
-        const [pa, pb] = ps.sort((x, y) => x.id - y.id);
-        const span =
-          pa?.tip && pb?.tip
-            ? {
-                d: Math.hypot(pb.tip.x - pa.tip.x, pb.tip.y - pa.tip.y),
-                angle: Math.atan2(-(pb.tip.y - pa.tip.y), pb.tip.x - pa.tip.x),
-              }
-            : null;
         out.push({
-          span,
+          spread: th[0]?.spread ?? null,
+          turn: th[0]?.turn ?? null,
           hud: document.querySelector('[data-testid="interaction-mode"]')?.textContent ?? null,
           chip: shown ? chip.textContent : null,
           limit: shown ? (chip.dataset.limit ?? null) : null,
@@ -115,30 +108,23 @@ async function playSampled(page: Page, right: HandKey[], left: HandKey[]): Promi
   );
 }
 
+/** Last two-hand sample at or before `until` (script ms), before fingers open on release. */
+function lastTwo(samples: Sample[], until: number) {
+  return samples.filter((s) => s.mode === 'two' && s.spread !== null && s.t <= until).at(-1)!;
+}
+
 /**
- * Fingertip spans while both hands drove the object, from the first frame of
- * the grab (closest to its snapshot) up to `until` (script ms), so fingers
- * opening on release don't count.
+ * Scale a two-hand grab should reach: the fingertip spread the engine measured
+ * (its raw input), less the 3% soft dead zone. This checks smoothing, limits
+ * and the scene update end to end, independent of how fast the page renders.
  */
-function spans(samples: Sample[], until: number) {
-  return samples.filter((s) => s.span && s.mode === 'two' && s.t <= until).map((s) => s.span!);
-}
-
-/** Scale two-hand grabs should reach: fingertip spread ratio, less the 3% soft dead zone. */
 function expectedScale(samples: Sample[], until: number) {
-  const s = spans(samples, until);
-  return Math.exp(Math.log(s.at(-1)!.d / s[0]!.d) - 0.03);
+  return Math.exp(Math.log(lastTwo(samples, until).spread!) - 0.03);
 }
 
-/** Roll two-hand grabs should reach, degrees: fingertip line turn, less the 2° dead zone. */
+/** Roll a two-hand grab should reach, degrees: the raw fingertip-line turn, less the 2° dead zone. */
 function expectedRollDeg(samples: Sample[], until: number) {
-  const s = spans(samples, until);
-  let turn = 0;
-  for (let i = 1; i < s.length; i++) {
-    const d = s[i]!.angle - s[i - 1]!.angle;
-    turn += Math.atan2(Math.sin(d), Math.cos(d));
-  }
-  return Math.abs((turn * 180) / Math.PI) - 2;
+  return Math.abs((lastTwo(samples, until).turn! * 180) / Math.PI) - 2;
 }
 
 /** Largest on-screen move of the cube between samples whose script times fall in [from, to]. */
@@ -216,9 +202,7 @@ test.describe('two-hand grab', () => {
       // cursors went 80 → 160 px apart; fingertips are closer together).
       const want = expectedScale(samples, 3000);
       expect(want).toBeGreaterThan(1.8);
-      // The first sample can land a frame or two after the snapshot while the
-      // second pinch is still closing, so allow 5%.
-      expect(Math.abs(after.scale / before.scale - want) / want).toBeLessThan(0.05);
+      expect(Math.abs(after.scale / before.scale - want) / want).toBeLessThan(0.03);
       // The hands' midpoint didn't move, and scaling is in place: the cube stayed put.
       const end = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
       const r = await page.evaluate(() => window.__G3D__.sceneRect());
@@ -269,7 +253,7 @@ test.describe('two-hand grab', () => {
     const after = await cube(page);
     const want = expectedScale(samples, 2600);
     expect(want).toBeGreaterThan(1.25);
-    expect(Math.abs(after.scale / before.scale - want) / want).toBeLessThan(0.05);
+    expect(Math.abs(after.scale / before.scale - want) / want).toBeLessThan(0.03);
   });
 
   test('spreading far past the limit stops at 3× and flags the limit', async ({ page }) => {
@@ -350,7 +334,7 @@ test.describe('two-hand grab', () => {
     // Scale follows the fingertip spread (synthetic hands don't turn their
     // fingers with the wheel, so it changes a little).
     const scaleWant = expectedScale(samples, end + 600);
-    expect(Math.abs(after.scale / before.scale - scaleWant) / scaleWant).toBeLessThan(0.05);
+    expect(Math.abs(after.scale / before.scale - scaleWant) / scaleWant).toBeLessThan(0.03);
   });
 
   test('one hand letting go leaves the other holding it, without a jump', async ({ page }) => {

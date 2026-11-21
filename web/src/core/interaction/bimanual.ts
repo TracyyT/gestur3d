@@ -90,6 +90,10 @@ export type Palms = readonly [number, number];
 export interface BimanualResult extends Pose {
   /** Scale relative to the snapshot, after limits. */
   scaleFactor: number;
+  /** Raw hand spread relative to the snapshot (before smoothing, dead zone and limits). */
+  spread: number;
+  /** Raw turn of the hand line since the snapshot, radians (before smoothing and dead zone). */
+  turn: number;
   /** Roll since the snapshot, radians, counter-clockwise on screen. */
   roll: number;
   /** Depth offset since the snapshot, world units toward the camera. */
@@ -232,6 +236,8 @@ export class BimanualGrip {
       position: [...pose.position],
       rotation: [...pose.rotation],
       scaleFactor: 1,
+      spread: 1,
+      turn: 0,
       roll: 0,
       depth: 0,
       atLimit: false,
@@ -303,6 +309,8 @@ export class BimanualGrip {
       rotation: quatNormalize(quatMultiply(turn, this.snap.pose.rotation)),
       scale,
       scaleFactor: k,
+      spread: Math.exp(Math.log(Math.max(sep, 1e-6)) - this.snap.logSep),
+      turn: this.angle - this.snap.angle,
       roll,
       depth,
       atLimit: rawLog >= hi || rawLog <= lo,
