@@ -12,7 +12,7 @@
   - Cursors per hand (cyan right, violet left) show detected, hovering (with pinch progress), grabbing, released and lost states.
   - Accurate at any window size and with the side panels open: the hand maps onto the visible scene area, and picking uses the same camera projection as rendering.
   - One Euro smoothing (adjustable), a "reach" setting for how far you move, and a 300 ms grace that freezes held objects through brief tracking dropouts.
-  - Detection runs in a Web Worker with a main-thread fallback. The tracking panel shows backend, detection rate, inference time and end-to-end latency, and can record landmarks (never video).
+  - Detection runs on the main thread by default (measured faster than the Web Worker, which stays available as a setting). The tracking panel shows backend, detection rate, inference time and end-to-end latency, and can record landmarks (never video).
 - **Workspace**: holographic lab environment with directly manipulable objects
   - Mouse: click to select, drag to move, Shift-drag to rotate, scroll to scale, drag empty space to orbit
   - Keyboard: Tab cycles objects, arrows move, Q/E/W/S rotate, +/− scale, Delete removes, ? shows controls
@@ -24,7 +24,7 @@
 
 ```mermaid
 flowchart TD
-  cam[Webcam] --> vision["Vision source<br/>MediaPipe Hand Landmarker<br/>(main thread in M1, worker in M2)"]
+  cam[Webcam] --> vision["Vision source<br/>MediaPipe Hand Landmarker<br/>(main thread or Web Worker)"]
   replay[Recorded landmarks] -.-> tracking
   vision --> tracking["Tracking<br/>coordinates, smoothing, hand identity (M2)"]
   tracking --> recog["Gesture recognition<br/>geometric + trained MLP / GRU via ONNX (M2–M5)"]
@@ -94,8 +94,8 @@ Performance numbers are recorded in [docs/benchmarks.md](docs/benchmarks.md). On
 | Milestone                         | Scope                                                                         | Status  |
 | --------------------------------- | ----------------------------------------------------------------------------- | ------- |
 | M1 Foundation                     | Repo, design system, landing, camera setup, mouse/keyboard workspace, HUD     | ✅ Done |
-| M2 Hand tracking and manipulation | Worker pipeline, smoothing, pinch grab/move/rotate, landmark recorder         | Next    |
-| M3 Advanced interactions          | Two-hand scale/rotate, air drawing, radial menu, state engine, rule baselines | Planned |
+| M2 Hand tracking and manipulation | Detection pipeline, smoothing, pinch grab/move/release, landmark recorder     | ✅ Done |
+| M3 Advanced interactions          | Two-hand scale/rotate, air drawing, radial menu, state engine, rule baselines | Next    |
 | M4 Dataset collection tool        | Record, label, review and export samples, multi-participant consent           | Planned |
 | M5 Model training                 | Static MLP and dynamic GRU/TCN, participant-grouped splits, ONNX in browser   | Planned |
 | M6 Effects and environments       | Particles, four environments, object library, adaptive quality                | Planned |

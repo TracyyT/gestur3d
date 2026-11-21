@@ -10,9 +10,9 @@ import { useSettings, type TrackingBackendPreference } from '@/stores/settings';
 import { Button, Panel, Select, buttonClasses } from '@/ui';
 
 const BACKENDS: Array<{ value: TrackingBackendPreference; label: string }> = [
-  { value: 'auto', label: 'Auto (worker, fall back to main)' },
-  { value: 'worker', label: 'Web Worker' },
   { value: 'main-thread', label: 'Main thread' },
+  { value: 'worker', label: 'Web Worker' },
+  { value: 'auto', label: 'Auto (worker, fall back to main)' },
 ];
 
 function Metric({ label, value, unit }: { label: string; value: string; unit?: string }) {

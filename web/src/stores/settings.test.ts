@@ -3,6 +3,7 @@ import {
   DEFAULT_SETTINGS,
   SETTINGS_STORAGE_KEY,
   resolveReducedMotion,
+  migrateSettings,
   useSettings,
 } from './settings';
 
@@ -38,5 +39,19 @@ describe('resolveReducedMotion', () => {
     ['off', true, false],
   ] as const)('pref=%s os=%s -> %s', (pref, os, expected) => {
     expect(resolveReducedMotion(pref, os)).toBe(expected);
+  });
+});
+
+describe('migrateSettings', () => {
+  it('moves the old auto default to the main thread', () => {
+    expect(migrateSettings({ trackingBackend: 'auto' }, 1).trackingBackend).toBe('main-thread');
+  });
+
+  it('keeps an explicit worker choice', () => {
+    expect(migrateSettings({ trackingBackend: 'worker' }, 1).trackingBackend).toBe('worker');
+  });
+
+  it('leaves auto alone once on v2', () => {
+    expect(migrateSettings({ trackingBackend: 'auto' }, 2).trackingBackend).toBe('auto');
   });
 });
