@@ -121,7 +121,7 @@ export function HandCursorOverlay() {
           if (lost) {
             if (!lostSince.has(p.id)) lostSince.set(p.id, now);
             const k = Math.max(0, 1 - (now - lostSince.get(p.id)!) / GRACE_MS);
-            if (k > 0) ring(p.screen.x, p.screen.y, 4 + 12 * k, 1.5, palette.ink2, 0.8, [2, 3]);
+            if (k > 0) ring(p.screen.x, p.screen.y, 3 + 9 * k, 1.5, palette.ink2, 0.8, [2, 3]);
           }
         }
         // Pivot dot.
@@ -231,24 +231,24 @@ export function HandCursorOverlay() {
           ctx.shadowBlur = 16;
           ctx.fillStyle = color;
           ctx.beginPath();
-          ctx.arc(x, y, 7, 0, Math.PI * 2);
+          ctx.arc(x, y, 5, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
-          ring(x, y, 14, 2.5, color, appear);
+          ring(x, y, 10.5, 2, color, appear);
           continue;
         }
 
         if (p.phase === 'pinching') {
           ctx.restore();
-          ring(x, y, 16 - 7 * p.pinchStrength, 1.5, color, 0.7 * appear, [3, 4]);
+          ring(x, y, 12 - 5 * p.pinchStrength, 1.5, color, 0.7 * appear, [3, 4]);
           continue;
         }
 
         const hovering = p.phase === 'hovering';
-        const r = hovering ? 22 : 16;
+        const r = hovering ? 16 : 11;
         ctx.shadowBlur = hovering ? 14 : 6;
         ctx.restore();
-        ring(x, y, r, hovering ? 2.5 : 2, color, (hovering ? 1 : 0.85) * appear);
+        ring(x, y, r, hovering ? 2 : 1.75, color, (hovering ? 1 : 0.85) * appear);
 
         // Another hand holds an object alone: a "+" says pinching here (on it
         // or on empty space) adds this hand to the grab. Otherwise a center dot.
@@ -265,10 +265,10 @@ export function HandCursorOverlay() {
           ctx.lineWidth = 2;
           ctx.lineCap = 'round';
           ctx.beginPath();
-          ctx.moveTo(x - 5, y);
-          ctx.lineTo(x + 5, y);
-          ctx.moveTo(x, y - 5);
-          ctx.lineTo(x, y + 5);
+          ctx.moveTo(x - 4, y);
+          ctx.lineTo(x + 4, y);
+          ctx.moveTo(x, y - 4);
+          ctx.lineTo(x, y + 4);
           ctx.stroke();
         } else {
           ctx.fillStyle = palette.ink1;
@@ -287,8 +287,8 @@ export function HandCursorOverlay() {
           ctx.beginPath();
           for (let i = 0; i < 4; i++) {
             const a = (i * Math.PI) / 2 + Math.PI / 4;
-            ctx.moveTo(x + Math.cos(a) * (r + 4), y + Math.sin(a) * (r + 4));
-            ctx.lineTo(x + Math.cos(a) * (r + 9), y + Math.sin(a) * (r + 9));
+            ctx.moveTo(x + Math.cos(a) * (r + 3), y + Math.sin(a) * (r + 3));
+            ctx.lineTo(x + Math.cos(a) * (r + 7), y + Math.sin(a) * (r + 7));
           }
           ctx.stroke();
           // Pinch progress arc: how close the fingers are to grabbing.
@@ -310,7 +310,7 @@ export function HandCursorOverlay() {
 
         if (!reduced && p.releasedAt !== null && now - p.releasedAt < RIPPLE_MS) {
           const t = (now - p.releasedAt) / RIPPLE_MS;
-          ring(x, y, 12 + 26 * t, 1.5, color, 0.7 * (1 - t));
+          ring(x, y, 9 + 22 * t, 1.5, color, 0.7 * (1 - t));
         }
       }
 
@@ -322,7 +322,7 @@ export function HandCursorOverlay() {
           continue;
         }
         if (twoHandIds.has(id)) continue;
-        ring(g.x, g.y, 14, 1.5, colorFor(g), 0.6 * (1 - t), [2, 4]);
+        ring(g.x, g.y, 10.5, 1.5, colorFor(g), 0.6 * (1 - t), [2, 4]);
       }
       for (const id of firstSeen.keys()) if (!live.has(id)) firstSeen.delete(id);
       for (const id of lostSince.keys()) if (!live.has(id)) lostSince.delete(id);
