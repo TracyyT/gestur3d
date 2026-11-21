@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Command, InputSource, SceneModel } from '@/core/interaction/commands';
 import { applyCommand, createInitialScene } from '@/core/interaction/sceneModel';
 
-export type InteractionMode = 'idle' | 'selecting' | 'moving' | 'rotating' | 'scaling';
+export type InteractionMode = 'idle' | 'selecting' | 'moving' | 'rotating' | 'scaling' | 'twoHand';
 
 interface SceneStore extends SceneModel {
   /** What the user is doing right now; shown in the HUD. */

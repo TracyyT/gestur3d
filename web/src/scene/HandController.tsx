@@ -13,7 +13,7 @@ import type { HandFrame } from '@/core/vision/types';
 import { handRuntime } from '@/features/hands/handRuntime';
 import { useHandTracking } from '@/features/hands/handTrackingStore';
 import { useHudLayout } from '@/stores/hudLayout';
-import { useScene } from '@/stores/scene';
+import { useScene, type InteractionMode } from '@/stores/scene';
 import { useSettings } from '@/stores/settings';
 import { visibleSceneRect } from './framing';
 import { objectRegistry } from './objectRegistry';
@@ -35,7 +35,7 @@ export function HandController() {
   const queue = useRef<HandFrame[]>([]);
   const display = useRef(new Map<number, { x: number; y: number }>());
   const config = useRef('');
-  const wasGrabbing = useRef(false);
+  const lastMode = useRef<InteractionMode | null>(null);
   const sizeRef = useRef({ width: 1, height: 1 });
   const lastFrame = useRef({ wall: -Infinity, ts: 0 });
 
@@ -185,10 +185,16 @@ export function HandController() {
     const tracks = tracker.expire(expireAt);
     if (!result || tracks.length !== before) result = run(expireAt, toInputs(tracks, false));
 
-    if (result.grabbing !== wasGrabbing.current) {
-      scene.setMode(result.grabbing ? 'moving' : 'selecting', 'gesture');
-      wasGrabbing.current = result.grabbing;
+    const mode: InteractionMode = result.twoHand.some((t) => t.mode === 'two')
+      ? 'twoHand'
+      : result.grabbing
+        ? 'moving'
+        : 'selecting';
+    // Only on changes, and never before the first grab, so mouse modes stand.
+    if (mode !== lastMode.current && (lastMode.current !== null || mode !== 'selecting')) {
+      scene.setMode(mode, 'gesture');
     }
+    lastMode.current = mode;
 
     // Cursors are drawn eased at render rate between 30 Hz detections.
     const k = 1 - Math.exp((-delta * 1000) / CURSOR_TAU_MS);
