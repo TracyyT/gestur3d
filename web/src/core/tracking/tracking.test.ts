@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { HandFrame, TrackedHand } from '@/core/vision/types';
 import { anchorPoint, HandTracker, maxPlausibleMove } from './handTracker';
 import { OneEuroFilter, smoothingToParams } from './oneEuro';
-import { PinchDetector, pinchRatio, sensitivityToThresholds } from './pinch';
+import { palmSize, PinchDetector, pinchRatio, sensitivityToThresholds } from './pinch';
 import { synthHand } from './synthetic';
 
 const frame = (t: number, ...hands: TrackedHand[]): HandFrame => ({
@@ -241,5 +241,29 @@ describe('HandTracker', () => {
   it('plausible-move budget grows with time between frames', () => {
     expect(maxPlausibleMove(100)).toBeGreaterThan(maxPlausibleMove(33));
     expect(maxPlausibleMove(10_000)).toBe(0.35);
+  });
+});
+
+describe('palmSize', () => {
+  it('grows with the hand (closer to the camera) and ignores the pinch', () => {
+    const small = palmSize(synthHand({ cx: 0.5, cy: 0.6, size: 0.1 }).image);
+    const big = palmSize(synthHand({ cx: 0.5, cy: 0.6, size: 0.15 }).image);
+    expect(big / small).toBeCloseTo(1.5, 5);
+    const pinched = palmSize(synthHand({ cx: 0.5, cy: 0.6, size: 0.1, pinch: 1 }).image);
+    expect(pinched).toBeCloseTo(small, 9);
+  });
+
+  it('is tracked and smoothed per hand', () => {
+    const t = new HandTracker();
+    const frame = (ts: number, size: number): HandFrame => ({
+      timestamp: ts,
+      detectionMs: 0,
+      hands: [synthHand({ cx: 0.5, cy: 0.6, size })],
+    });
+    const first = t.update(frame(0, 0.1), 16 / 9)[0]!;
+    expect(first.palm).toBeCloseTo(palmSize(frame(0, 0.1).hands[0]!.image, 16 / 9));
+    const next = t.update(frame(33, 0.15), 16 / 9)[0]!;
+    expect(next.palm).toBeGreaterThan(first.palm);
+    expect(next.palm).toBeLessThan(palmSize(frame(0, 0.15).hands[0]!.image, 16 / 9));
   });
 });
