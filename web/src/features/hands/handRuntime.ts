@@ -14,6 +14,12 @@ export const handRuntime = {
   lastFrameTs: 0,
   /** Active two-hand grabs. */
   twoHand: [] as TwoHandInfo[],
+  /**
+   * Recent two-hand modes, one entry per change ('two', 'one', 'frozen',
+   * 'none'), capped. Brief states (a hand lost for 200 ms) stay visible here
+   * even when rendering is too slow to sample them.
+   */
+  twoHandModes: [] as string[],
   /** Objects currently hovered by a hand. */
   hovered: new Set<string>(),
   /** Object the mouse is dragging, so hands can't grab it. */
@@ -29,6 +35,7 @@ export const handRuntime = {
     this.pointers = [];
     this.held.clear();
     this.twoHand = [];
+    this.twoHandModes = [];
     this.hovered.clear();
     this.frames.reset();
     this.latency.reset();

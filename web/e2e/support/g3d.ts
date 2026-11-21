@@ -27,6 +27,7 @@ export interface G3D {
     turn: number;
   }>;
   objectUV(id: string): UV | null;
+  twoHandModes(): string[];
   scriptTime(): number | null;
   sceneRect(): { left: number; top: number; width: number; height: number };
   playGrab(s: {

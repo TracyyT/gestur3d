@@ -147,6 +147,12 @@ export function HandController() {
     const run = (t: number, inputs: PointerInput[]) => {
       const r = engine.update(t, inputs, query, blocked);
       for (const cmd of r.commands) scene.dispatch(cmd, 'gesture');
+      const mode = r.twoHand[0]?.mode ?? 'none';
+      const modes = handRuntime.twoHandModes;
+      if (modes.at(-1) !== mode) {
+        modes.push(mode);
+        if (modes.length > 200) modes.shift();
+      }
       return r;
     };
 

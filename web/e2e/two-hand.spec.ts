@@ -418,10 +418,9 @@ test.describe('two-hand grab', () => {
       { at: 4700, ...Lfar, pinch: 0 },
     ];
     const samples = await playSampled(page, right, left);
-    expect(
-      samples.some((s) => s.mode === 'one'),
-      'saw the one-hand-lost state',
-    ).toBe(true);
+    // The engine's own mode history: brief states can fall between rendered samples.
+    const modes = await page.evaluate(() => window.__G3D__.twoHandModes());
+    expect(modes, 'saw the one-hand-lost state').toContain('one');
     expect(maxDrift(samples, 2000, 4250)).toBeLessThanOrEqual(1);
   });
 
