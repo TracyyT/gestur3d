@@ -1,7 +1,7 @@
 import { OrbitControls } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import { Bloom, EffectComposer } from '@react-three/postprocessing';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useDraw } from '@/features/drawing/drawStore';
 import { useScene } from '@/stores/scene';
@@ -39,10 +39,12 @@ function SceneObjects({
 }
 
 /**
- * The workspace 3D view. Drag empty space to orbit, click an object to
- * select it; HoloObject handles direct manipulation.
+ * The 3D view every mode shares: environment, scene objects, hand and mouse
+ * input, drawing and post-processing. Drag empty space to orbit, click an
+ * object to select it; HoloObject handles direct manipulation. A mode adds
+ * its own scene content (targets, guides, ghosts) as children.
  */
-export default function WorkspaceCanvas() {
+export default function SceneCanvas({ children }: { children?: ReactNode }) {
   const reducedMotion = useReducedMotion();
   const particleDensity = useSettings((s) => s.particleDensity);
   const quality = useSettings((s) => s.visualQuality);
@@ -75,6 +77,7 @@ export default function WorkspaceCanvas() {
       <MouseDrawing />
       <HoloLab particleDensity={particleDensity} />
       <SceneObjects instant={reducedMotion} onHoverChange={onHoverChange} />
+      {children}
       <OrbitControls
         makeDefault
         target={[0, 0.15, 0]}

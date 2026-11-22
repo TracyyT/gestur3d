@@ -3,14 +3,13 @@ import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { useCameraSession } from '@/features/camera/cameraSession';
 import { useReducedMotionAttribute } from '@/hooks/useReducedMotion';
+import { isCameraRoute } from '@/features/modes/modes';
 
-/** Routes allowed to keep the camera running. Anywhere else, it switches off. */
-const CAMERA_ROUTES = ['/setup', '/workspace'];
-
+/** The camera may run on setup and in the modes. Anywhere else, it switches off. */
 function useCameraRouteGuard() {
   const { pathname } = useLocation();
   useEffect(() => {
-    if (!CAMERA_ROUTES.includes(pathname)) useCameraSession.getState().stop();
+    if (!isCameraRoute(pathname)) useCameraSession.getState().stop();
   }, [pathname]);
 
   useEffect(() => {
