@@ -1,6 +1,6 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
-import { Plane, Raycaster, Vector2, Vector3 } from 'three';
+import { Box3, Plane, Raycaster, Sphere, Vector2, Vector3 } from 'three';
 import type { Vec3 } from '@/core/interaction/commands';
 import {
   HandInteractionEngine,
@@ -53,6 +53,8 @@ export function HandController() {
       right: new Vector3(),
       up: new Vector3(),
       back: new Vector3(),
+      bounds: new Box3(),
+      sphere: new Sphere(),
     }),
     [],
   );
@@ -104,7 +106,7 @@ export function HandController() {
     const rect = visibleSceneRect(useHudLayout.getState().panelsVisible, size.width, size.height);
     const box = interactionBox(settings.handReach, aspect, rect.width / rect.height);
 
-    const { raycaster, ndc, plane, v, n, right, up, back } = tools;
+    const { raycaster, ndc, plane, v, n, right, up, back, bounds, sphere } = tools;
     state.camera.matrixWorld.extractBasis(right, up, back);
     const aim = (x: number, y: number) => {
       ndc.fromArray(screenToNdc(x, y, size.width, size.height));
@@ -130,6 +132,18 @@ export function HandController() {
         right: [right.x, right.y, right.z],
         up: [up.x, up.y, up.z],
       }),
+      objectScreen: (id) => {
+        const mesh = objectRegistry.get(id);
+        if (!mesh) return null;
+        bounds.setFromObject(mesh).getBoundingSphere(sphere);
+        const toPx = (p: Vector3) => {
+          p.project(state.camera);
+          return [((p.x + 1) / 2) * size.width, ((1 - p.y) / 2) * size.height] as const;
+        };
+        const [cx, cy] = toPx(v.copy(sphere.center));
+        const [ex, ey] = toPx(v.copy(sphere.center).addScaledVector(right, sphere.radius));
+        return { x: cx, y: cy, r: Math.hypot(ex - cx, ey - cy) };
+      },
     };
     const scene = useScene.getState();
     const blocked = (id: string) => handRuntime.mouseDragId === id;

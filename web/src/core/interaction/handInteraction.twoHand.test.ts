@@ -397,6 +397,32 @@ describe('two-hand grabs', () => {
       expect(dist(world.pos(), at)).toBeLessThan(1e-9);
     });
 
+    it('counts an open hand near a small object, not only on it', () => {
+      const world = new World({ a: [2, 2, 0] });
+      const engine = new HandInteractionEngine();
+      const query: SceneQuery = {
+        ...world.query(),
+        // A small object: 20 px radius on screen, so the zone is the 150 px minimum.
+        objectScreen: () => ({ x: 200, y: 200, r: 20 }),
+      };
+      let t = 0;
+      const step = (...inputs: PointerInput[]) => engine.update((t += 33), inputs, query, never);
+      step(hand(1, 190, 200, OPEN), openHand(600, 500, 0.1));
+      step(holder(190, START), openHand(600, 500, 0.1));
+      let r!: EngineResult;
+      // 130 px away: off the object, inside the zone.
+      for (let i = 0; i < 10; i++) r = step(holder(), openHand(330, 200, 0.1));
+      expect(r.depth).toHaveLength(1);
+      // 200 px away: outside it.
+      const engine2 = new HandInteractionEngine();
+      t = 0;
+      const step2 = (...inputs: PointerInput[]) => engine2.update((t += 33), inputs, query, never);
+      step2(hand(1, 190, 200, OPEN), openHand(600, 500, 0.1));
+      step2(holder(190, START), openHand(600, 500, 0.1));
+      for (let i = 0; i < 10; i++) r = step2(holder(), openHand(400, 200, 0.1));
+      expect(r.depth).toHaveLength(0);
+    });
+
     it('an open hand that is not over the object, or only passing, does nothing', () => {
       const { world, step } = rig();
       step(hand(1, 190, 200, OPEN), openHand(600, 500, 0.1));
