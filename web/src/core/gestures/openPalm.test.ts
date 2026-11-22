@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { synthHand } from '@/core/tracking/synthetic';
 import { HandLandmark as L } from '@/core/vision/types';
 import { OpenPalmDetector } from './openPalmDetector';
-import { isOpenPalm } from './rules/openPalm';
+import { isFist, isOpenHand, isOpenPalm } from './rules/openPalm';
 
 /** World landmarks of the synthetic hand, with fingers fanned out by `fanDeg`. */
 function palm({ fanDeg = 30, pinch = 0 } = {}) {
@@ -37,12 +37,16 @@ function turned(w: Float32Array, deg: number) {
   return out;
 }
 
-/** Curl a finger: move its tip and DIP back toward the MCP. */
+/** Curl a finger: fold its DIP and tip back down toward the wrist, past the PIP. */
 function curl(w: Float32Array, mcp: number, joints: number[]) {
   const out = Float32Array.from(w);
-  for (const j of joints) {
-    for (let k = 0; k < 2; k++)
-      out[j * 3 + k] = w[mcp * 3 + k]! + (w[j * 3 + k]! - w[mcp * 3 + k]!) * 0.2;
+  const [, dip, tip] = joints;
+  for (const [j, k] of [
+    [dip!, 0.15],
+    [tip!, 0.35],
+  ] as const) {
+    for (let c = 0; c < 3; c++)
+      out[j * 3 + c] = w[mcp * 3 + c]! + (w[L.Wrist * 3 + c]! - w[mcp * 3 + c]!) * k;
   }
   return out;
 }
@@ -138,5 +142,39 @@ describe('OpenPalmDetector', () => {
     expect(progress).toBeGreaterThan(0.7);
     for (let t = 533; t <= 800; t += 33) d2.update(t, { ...still(t), world: palm({ fanDeg: 0 }) });
     expect(d2.update(833, still(833)).progress).toBe(0);
+  });
+});
+
+describe('isOpenHand', () => {
+  it('accepts a plain open hand (no spread needed), facing either way', () => {
+    expect(isOpenHand(synthHand({ cx: 0.5, cy: 0.6 }).world)).toBe(true);
+    expect(isOpenHand(turned(palm({ fanDeg: 0 }), 180))).toBe(true);
+    expect(isOpenHand(turned(palm({ fanDeg: 0 }), 40))).toBe(true);
+  });
+
+  it('rejects a pinch, a curled finger, a side-on hand and degenerate input', () => {
+    expect(isOpenHand(synthHand({ cx: 0.5, cy: 0.6, pinch: 1 }).world)).toBe(false);
+    expect(isOpenHand(curl(palm(), L.MiddleMcp, [L.MiddlePip, L.MiddleDip, L.MiddleTip]))).toBe(
+      false,
+    );
+    expect(isOpenHand(turned(palm(), 65))).toBe(false);
+    expect(isOpenHand(new Float32Array(63))).toBe(false);
+  });
+});
+
+describe('isFist', () => {
+  it('is true only when all four fingers are curled', () => {
+    let w = palm();
+    expect(isFist(w)).toBe(false);
+    for (const [mcp, j] of [
+      [L.IndexMcp, [L.IndexPip, L.IndexDip, L.IndexTip]],
+      [L.MiddleMcp, [L.MiddlePip, L.MiddleDip, L.MiddleTip]],
+      [L.RingMcp, [L.RingPip, L.RingDip, L.RingTip]],
+    ] as const) {
+      w = curl(w, mcp, [...j]);
+      expect(isFist(w)).toBe(false);
+    }
+    w = curl(w, L.PinkyMcp, [L.PinkyPip, L.PinkyDip, L.PinkyTip]);
+    expect(isFist(w)).toBe(true);
   });
 });

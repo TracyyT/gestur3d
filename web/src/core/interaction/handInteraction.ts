@@ -1,6 +1,7 @@
 import type { PinchState } from '@/core/tracking/pinch';
 import type { Handedness } from '@/core/vision/types';
-import { BimanualGrip, type Pose, type ViewBasis } from './bimanual';
+import { OneEuroFilter } from '@/core/tracking/oneEuro';
+import { BimanualGrip, softDeadZone, type Pose, type ViewBasis } from './bimanual';
 import type { Command, Vec3 } from './commands';
 import { clampPosition } from './sceneModel';
 
@@ -26,8 +27,10 @@ export interface PointerInput {
    * meet while their knuckle cursors can't.
    */
   tip?: ScreenPos;
-  /** Apparent palm size (larger = closer to the camera), for depth gestures. */
+  /** Apparent palm size (larger = closer to the camera), for the depth gesture. */
   palm?: number;
+  /** Open hand (fingers extended, palm toward the camera), for the depth gesture. */
+  open?: boolean;
   pinch: PinchState;
 }
 
@@ -94,6 +97,8 @@ export interface EngineResult {
   grabbing: boolean;
   /** Active two-hand grabs. */
   twoHand: TwoHandInfo[];
+  /** Active open-hand depth controls. */
+  depth: DepthInfo[];
 }
 
 interface GrabState {
@@ -103,7 +108,45 @@ interface GrabState {
   /** Object position minus grab point, so the object doesn't snap to the cursor. */
   offset: Vec3;
   last: Vec3;
+  /** The other hand, held open over the object, is setting its depth. */
+  depth?: DepthControl;
+  /** An open hand over the object, waiting out the engage delay. */
+  pendingDepth?: { hand: number; since: number };
 }
+
+interface DepthControl {
+  hand: number;
+  /** log palm size when depth control started. */
+  logPalm0: number;
+  filter: OneEuroFilter;
+  /** World units toward the camera since depth control started. */
+  value: number;
+  /** Last time the hand still qualified (for the exit grace). */
+  seen: number;
+}
+
+/** What the open-hand depth gesture is doing, for feedback. */
+export interface DepthInfo {
+  objectId: string;
+  /** Hand holding the object. */
+  holderId: number;
+  /** Open hand setting the depth. */
+  handId: number;
+  /** World units toward the camera since it started (negative = away). */
+  depth: number;
+}
+
+/** Open-hand depth tuning. */
+export const DEPTH_HAND = {
+  /** The open hand must stay over the object this long before it takes over. */
+  engageMs: 250,
+  /** Brief non-open frames (a finger flicker) don't end it. */
+  exitMs: 200,
+  /** World units per unit of log palm-size change. */
+  gain: 4,
+  deadZone: 0.03,
+  filter: { minCutoff: 0.6, beta: 0.3, dCutoff: 1.0 },
+} as const;
 
 interface PointerMemory {
   grab: GrabState | null;
@@ -132,6 +175,13 @@ interface TwoHandSession {
 
 const MOVE_EPSILON = 1e-4;
 const DEFAULT_VIEW: ViewBasis = { right: [1, 0, 0], up: [0, 1, 0] };
+
+/** Unit vector a × b. */
+function cross(a: Readonly<Vec3>, b: Readonly<Vec3>): Vec3 {
+  const c: Vec3 = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const l = Math.hypot(c[0], c[1], c[2]) || 1;
+  return [c[0] / l, c[1] / l, c[2] / l];
+}
 
 /**
  * Hover / grab / move / release for hands.
@@ -186,6 +236,10 @@ export class HandInteractionEngine {
       this.memory.delete(id);
     }
 
+    const view = scene.view?.() ?? DEFAULT_VIEW;
+    const toward = cross(view.right, view.up);
+    this.updateDepth(now, inputs, byId, scene);
+
     const pointers: HandPointer[] = [];
     for (const input of inputs) {
       let m = this.memory.get(input.id);
@@ -218,7 +272,7 @@ export class HandInteractionEngine {
           pointers.push(this.pointer(input, hoverId ? 'hovering' : 'tracking', hoverId, m));
           continue;
         }
-        this.moveOneHand(input, m.grab, scene, commands);
+        this.moveOneHand(input, m.grab, scene, commands, toward);
         pointers.push(this.pointer(input, 'grabbing', null, m));
         continue;
       }
@@ -303,6 +357,18 @@ export class HandInteractionEngine {
       held,
       grabbing: held.size > 0,
       twoHand: [...this.sessions.values()].map((s) => s.info),
+      depth: [...this.memory].flatMap(([holderId, m]) =>
+        m.grab?.depth
+          ? [
+              {
+                objectId: m.grab.objectId,
+                holderId,
+                handId: m.grab.depth.hand,
+                depth: m.grab.depth.value,
+              },
+            ]
+          : [],
+      ),
     };
   }
 
@@ -353,17 +419,96 @@ export class HandInteractionEngine {
     };
   }
 
+  /**
+   * Open-hand depth: while one hand holds an object alone, the other hand,
+   * held open over the object for a moment, sets how far it is from the
+   * camera. Bringing that hand closer (its palm looks bigger) brings the
+   * object closer. The holding hand keeps moving it sideways and up/down.
+   * It ends when the open hand closes, pinches (which joins a two-hand grab),
+   * or leaves; the object stays at its new depth.
+   */
+  private updateDepth(
+    now: number,
+    inputs: PointerInput[],
+    byId: Map<number, PointerInput>,
+    scene: SceneQuery,
+  ) {
+    for (const [holderId, m] of this.memory) {
+      const grab = m.grab;
+      if (!grab || this.sessions.has(grab.objectId)) continue;
+      const holder = byId.get(holderId);
+      if (!holder || holder.status !== 'tracking') continue;
+
+      const qualifies = (p: PointerInput | undefined): p is PointerInput & { palm: number } =>
+        !!p &&
+        p.id !== holderId &&
+        p.status === 'tracking' &&
+        !!p.open &&
+        !p.pinch.active &&
+        !p.pinch.closed &&
+        !this.memory.get(p.id)?.grab &&
+        !!p.palm &&
+        p.palm > 0;
+
+      if (grab.depth) {
+        const d = grab.depth;
+        const hand = byId.get(d.hand);
+        const pinching = !!hand && (hand.pinch.active || !!hand.pinch.closed);
+        if (qualifies(hand)) {
+          d.seen = now;
+          d.value =
+            DEPTH_HAND.gain *
+            d.filter.filter(
+              softDeadZone(Math.log(hand.palm) - d.logPalm0, DEPTH_HAND.deadZone),
+              now,
+            );
+        } else if (pinching || !hand || now - d.seen > DEPTH_HAND.exitMs) {
+          // Keep the new depth: re-anchor the holding hand where the object is.
+          m.grab = this.anchor(grab.objectId, grab.last, holder, scene);
+        }
+        continue;
+      }
+
+      const over = inputs.find(
+        (p) => qualifies(p) && p.inBox && scene.pick(p.screen) === grab.objectId,
+      );
+      if (!over) {
+        grab.pendingDepth = undefined;
+        continue;
+      }
+      if (grab.pendingDepth?.hand !== over.id) grab.pendingDepth = { hand: over.id, since: now };
+      if (now - grab.pendingDepth.since >= DEPTH_HAND.engageMs) {
+        const filter = new OneEuroFilter(DEPTH_HAND.filter);
+        filter.filter(0, now);
+        grab.depth = {
+          hand: over.id,
+          logPalm0: Math.log((over as PointerInput & { palm: number }).palm),
+          filter,
+          value: 0,
+          seen: now,
+        };
+        grab.pendingDepth = undefined;
+      }
+    }
+  }
+
   private moveOneHand(
     input: PointerInput,
     grab: GrabState,
     scene: SceneQuery,
     commands: Command[],
+    toward: Vec3 = [0, 0, 1],
   ) {
     // Fingers opening (still pinched, past the start threshold): hold the
     // object still so letting go never drags it.
     const hit = input.pinch.releasing ? null : scene.planePoint(input.screen, grab.planeOrigin);
     if (!hit) return;
-    const next: Vec3 = [hit[0] + grab.offset[0], hit[1] + grab.offset[1], hit[2] + grab.offset[2]];
+    const z = grab.depth?.value ?? 0;
+    const next: Vec3 = [
+      hit[0] + grab.offset[0] + toward[0] * z,
+      hit[1] + grab.offset[1] + toward[1] * z,
+      hit[2] + grab.offset[2] + toward[2] * z,
+    ];
     const moved = Math.hypot(
       next[0] - grab.last[0],
       next[1] - grab.last[1],

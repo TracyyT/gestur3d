@@ -10,6 +10,7 @@ const MODE_LABEL: Record<InteractionMode, string> = {
   rotating: 'Rotating',
   scaling: 'Scaling',
   twoHand: 'Two-hand',
+  depth: 'Depth',
 };
 
 const read = () => renderStats.snapshot();

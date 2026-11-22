@@ -48,7 +48,8 @@ export class PalmMenuController {
       let d = this.detectors.get(t.id);
       if (!d) this.detectors.set(t.id, (d = new OpenPalmDetector()));
       const p = result.pointers.find((x) => x.id === t.id);
-      const allowed = !!p && !p.grabbedId && result.twoHand.length === 0 && !t.pinch.active;
+      // Never while any hand holds something: an open hand then sets depth.
+      const allowed = !!p && result.held.size === 0 && !t.pinch.active;
       const r = d.update(now, { world: t.world, center: t.anchor, allowed });
       if (r.progress > 0) handRuntime.palmProgress.set(t.id, r.progress);
       if (r.completed && p) {

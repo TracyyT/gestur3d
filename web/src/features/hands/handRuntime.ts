@@ -1,4 +1,4 @@
-import type { HandPointer, TwoHandInfo } from '@/core/interaction/handInteraction';
+import type { DepthInfo, HandPointer, TwoHandInfo } from '@/core/interaction/handInteraction';
 import { RateMeter } from '@/core/vision/rateMeter';
 
 /**
@@ -14,6 +14,8 @@ export const handRuntime = {
   lastFrameTs: 0,
   /** Active two-hand grabs. */
   twoHand: [] as TwoHandInfo[],
+  /** Active open-hand depth controls. */
+  depth: [] as DepthInfo[],
   /**
    * Recent two-hand modes, one entry per change ('two', 'one', 'frozen',
    * 'none'), capped. Brief states (a hand lost for 200 ms) stay visible here
@@ -37,6 +39,7 @@ export const handRuntime = {
     this.pointers = [];
     this.held.clear();
     this.twoHand = [];
+    this.depth = [];
     this.twoHandModes = [];
     this.hovered.clear();
     this.palmProgress.clear();

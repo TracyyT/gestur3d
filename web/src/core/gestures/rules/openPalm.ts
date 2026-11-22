@@ -90,3 +90,39 @@ export function isFist(world: ArrayLike<number>): boolean {
     ] as const
   ).every(([pip, tip]) => d(tip, L.Wrist) < d(pip, L.Wrist));
 }
+
+/**
+ * A plain open hand: all four fingers extended and the palm turned toward the
+ * camera (within 50°, either side). Looser than `isOpenPalm` (no spread or
+ * thumb rule): it's used while the other hand holds an object, where an open
+ * hand over the object sets its depth.
+ */
+export function isOpenHand(world: ArrayLike<number>): boolean {
+  const p = (i: number) => [world[i * 3]!, world[i * 3 + 1]!, world[i * 3 + 2]!] as const;
+  const d = (a: number, b: number) => {
+    const [ax, ay, az] = p(a);
+    const [bx, by, bz] = p(b);
+    return Math.hypot(ax - bx, ay - by, az - bz);
+  };
+  if (!(d(L.Wrist, L.MiddleMcp) > 1e-6)) return false;
+  const [wx, wy, wz] = p(L.Wrist);
+  const [ix, iy, iz] = p(L.IndexMcp);
+  const [px, py, pz] = p(L.PinkyMcp);
+  const u = [ix - wx, iy - wy, iz - wz];
+  const v = [px - wx, py - wy, pz - wz];
+  const n = [
+    u[1]! * v[2]! - u[2]! * v[1]!,
+    u[2]! * v[0]! - u[0]! * v[2]!,
+    u[0]! * v[1]! - u[1]! * v[0]!,
+  ];
+  const nl = Math.hypot(n[0]!, n[1]!, n[2]!);
+  if (!(nl > 0) || Math.abs(n[2]!) / nl < Math.cos((50 * Math.PI) / 180)) return false;
+  return (
+    [
+      [L.IndexPip, L.IndexTip],
+      [L.MiddlePip, L.MiddleTip],
+      [L.RingPip, L.RingTip],
+      [L.PinkyPip, L.PinkyTip],
+    ] as const
+  ).every(([pip, tip]) => d(tip, L.Wrist) > 1.1 * d(pip, L.Wrist));
+}

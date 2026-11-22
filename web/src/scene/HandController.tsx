@@ -16,6 +16,7 @@ import { useHudLayout } from '@/stores/hudLayout';
 import { useScene, type InteractionMode } from '@/stores/scene';
 import { useSettings } from '@/stores/settings';
 import { PalmMenuController } from '@/features/menu/palmMenu';
+import { isOpenHand } from '@/core/gestures/rules/openPalm';
 import { useMenu } from '@/features/menu/menuStore';
 import { visibleSceneRect } from './framing';
 import { objectRegistry } from './objectRegistry';
@@ -148,6 +149,7 @@ export function HandController() {
           inBox: mapped.inBox,
           tip: { x: tip.x, y: tip.y },
           palm: t.palm,
+          open: t.world ? isOpenHand(t.world) : false,
           pinch: muted
             ? { ...t.pinch, active: false, closed: false, started: false, ended: false }
             : edges
@@ -195,9 +197,11 @@ export function HandController() {
 
     const mode: InteractionMode = result.twoHand.some((t) => t.mode === 'two')
       ? 'twoHand'
-      : result.grabbing
-        ? 'moving'
-        : 'selecting';
+      : result.depth.length
+        ? 'depth'
+        : result.grabbing
+          ? 'moving'
+          : 'selecting';
     // Only on changes, and never before the first grab, so mouse modes stand.
     if (mode !== lastMode.current && (lastMode.current !== null || mode !== 'selecting')) {
       scene.setMode(mode, 'gesture');
@@ -221,6 +225,7 @@ export function HandController() {
     handRuntime.pointers = result.pointers;
     handRuntime.held = result.held;
     handRuntime.twoHand = result.twoHand;
+    handRuntime.depth = result.depth;
     handRuntime.hovered = new Set(result.pointers.flatMap((p) => (p.hoverId ? [p.hoverId] : [])));
   });
 

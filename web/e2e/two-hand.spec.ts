@@ -423,4 +423,42 @@ test.describe('two-hand grab', () => {
     expect(modes, 'saw the one-hand-lost state').toContain('one');
     expect(maxDrift(samples, 2000, 4250)).toBeLessThanOrEqual(1);
   });
+
+  test('an open hand over the held object sets its depth; leaving keeps it', async ({ page }) => {
+    await open(page, 1440, 900, true);
+    const c = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
+    const at = await px(page);
+    const R = at(20, 0, c);
+    const L = at(-25, 10, c);
+    // Right holds the cube. Left stays open over it; from 1.4 s to 2.2 s it
+    // comes 25% closer to the camera, then leaves view at 2.6 s.
+    const right: HandKey[] = [
+      { at: 0, ...R, pinch: 0 },
+      { at: 400, ...R, pinch: 0 },
+      { at: 550, ...R, pinch: 1 },
+      { at: 3400, ...R, pinch: 1 },
+      { at: 3550, ...R, pinch: 0 },
+      { at: 3800, ...R, pinch: 0 },
+    ];
+    const left: HandKey[] = [
+      { at: 0, ...L, pinch: 0, size: 0.12 },
+      { at: 1400, ...L, pinch: 0, size: 0.12 },
+      { at: 2200, ...L, pinch: 0, size: 0.15 },
+      { at: 2600, ...L, pinch: 0, size: 0.15 },
+      { at: 2601, ...L, pinch: 0, size: 0.15, visible: false },
+      { at: 3800, ...L, pinch: 0, size: 0.15, visible: false },
+    ];
+    const before = await cube(page);
+    const samples = await playSampled(page, right, left);
+    const after = await cube(page);
+    const dz = after.position[2] - before.position[2];
+    // 4 × (ln 1.25 − 0.03) ≈ 0.77 toward the camera, give or take smoothing.
+    expect(dz).toBeGreaterThan(0.6);
+    expect(dz).toBeLessThan(0.85);
+    expect(after.scale).toBeCloseTo(before.scale, 6);
+    expect(samples.some((s) => s.hud === 'Depth')).toBe(true);
+    expect(samples.some((s) => /closer$/.test(s.chip ?? ''))).toBe(true);
+    // After the open hand left, nothing jumped while the right hand held still.
+    expect(maxDrift(samples, 2700, 3350)).toBeLessThanOrEqual(1);
+  });
 });
