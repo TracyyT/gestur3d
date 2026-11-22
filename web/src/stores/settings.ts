@@ -26,7 +26,7 @@ export interface SettingsState {
    * back to the main thread.
    */
   trackingBackend: TrackingBackendPreference;
-  /** An open palm held still opens the radial menu. */
+  /** Pointing (index finger up) held still opens the radial menu. Key kept from the open-palm version. */
   palmMenu: boolean;
   /** Both hands moving toward / away from the camera move a two-hand grab in depth. */
   twoHandDepth: boolean;

@@ -1,6 +1,6 @@
 import { HoldTracker } from '@/core/gestures/holdTracker';
-import { OpenPalmDetector } from '@/core/gestures/openPalmDetector';
-import { isFist } from '@/core/gestures/rules/openPalm';
+import { PoseHoldDetector } from '@/core/gestures/poseHoldDetector';
+import { isFist, isPointing } from '@/core/gestures/rules/handPoses';
 import type { EngineResult } from '@/core/interaction/handInteraction';
 import { MENU_GEOMETRY } from '@/core/interaction/radialMenu';
 import type { TrackSnapshot } from '@/core/tracking/handTracker';
@@ -16,14 +16,14 @@ interface Rect {
 
 /**
  * Opens and drives the radial menu with a hand, one detection frame at a time:
- * - an open palm held still opens it at that hand's cursor (kept inside the
- *   visible scene);
+ * - pointing (index finger up, other fingers curled) held still opens it at
+ *   that hand's cursor (kept inside the visible scene);
  * - that hand's cursor then points, and a new pinch chooses;
  * - closing the hand (a fist) or losing it closes the menu.
  * Hands holding something, or a two-hand grab, never open it.
  */
-export class PalmMenuController {
-  private detectors = new Map<number, OpenPalmDetector>();
+export class GestureMenuController {
+  private detectors = new Map<number, PoseHoldDetector>();
   private fist = new HoldTracker(150, 60);
   /** Track that opened the menu, while it's open. */
   menuHand: number | null = null;
@@ -35,7 +35,7 @@ export class PalmMenuController {
 
     const live = new Set(tracks.map((t) => t.id));
     for (const id of this.detectors.keys()) if (!live.has(id)) this.detectors.delete(id);
-    handRuntime.palmProgress.clear();
+    handRuntime.menuProgress.clear();
 
     if (this.menuHand !== null) {
       this.drive(now, tracks, result, menu);
@@ -46,12 +46,12 @@ export class PalmMenuController {
     for (const t of tracks) {
       if (t.status !== 'tracking' || !t.world) continue;
       let d = this.detectors.get(t.id);
-      if (!d) this.detectors.set(t.id, (d = new OpenPalmDetector()));
+      if (!d) this.detectors.set(t.id, (d = new PoseHoldDetector(isPointing)));
       const p = result.pointers.find((x) => x.id === t.id);
-      // Never while any hand holds something: an open hand then sets depth.
+      // Never while any hand holds something.
       const allowed = !!p && result.held.size === 0 && !t.pinch.active;
       const r = d.update(now, { world: t.world, center: t.anchor, allowed });
-      if (r.progress > 0) handRuntime.palmProgress.set(t.id, r.progress);
+      if (r.progress > 0) handRuntime.menuProgress.set(t.id, r.progress);
       if (r.completed && p) {
         const m = MENU_GEOMETRY.outerOuter + 6;
         const clamp = (v: number, lo: number, hi: number) =>
@@ -63,7 +63,7 @@ export class PalmMenuController {
         );
         this.menuHand = t.id;
         this.fist.reset();
-        handRuntime.palmProgress.clear();
+        handRuntime.menuProgress.clear();
         return;
       }
     }
@@ -98,6 +98,6 @@ export class PalmMenuController {
   reset() {
     this.detectors.clear();
     this.menuHand = null;
-    handRuntime.palmProgress.clear();
+    handRuntime.menuProgress.clear();
   }
 }

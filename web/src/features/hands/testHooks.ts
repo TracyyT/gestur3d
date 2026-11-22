@@ -39,8 +39,8 @@ export interface HandKey extends UV {
   visible?: boolean;
   /** Synthetic hand size (default 0.12); bigger = closer to the camera. */
   size?: number;
-  /** Finger spread in degrees (0 = relaxed; ~40 = deliberate open palm). */
-  spread?: number;
+  /** Pointing pose: index up, other fingers curled (opens the menu when held). */
+  point?: boolean;
 }
 
 export interface TwoHandScript {
@@ -137,9 +137,9 @@ function grabRecording({
 
 function handRecording(keys: HandKey[], handedness: Handedness, jitter = 0): Recording {
   return scriptedRecording(
-    keys.map(({ at, u, v, pinch, visible, size, spread }) => {
+    keys.map(({ at, u, v, pinch, visible, size, point }) => {
       const [cx, cy] = wristAt({ u, v }, pinch, handedness, size);
-      return { at, cx, cy, pinch, visible, size, spread };
+      return { at, cx, cy, pinch, visible, size, point };
     }),
     { handedness, aspect: ASPECT, jitter },
   );

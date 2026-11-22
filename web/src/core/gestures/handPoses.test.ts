@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { synthHand } from '@/core/tracking/synthetic';
 import { HandLandmark as L } from '@/core/vision/types';
-import { OpenPalmDetector } from './openPalmDetector';
-import { isFist, isOpenHand, isOpenPalm } from './rules/openPalm';
+import { PoseHoldDetector } from './poseHoldDetector';
+import { isFist, isOpenHand, isPointing } from './rules/handPoses';
 
 /** World landmarks of the synthetic hand, with fingers fanned out by `fanDeg`. */
 function palm({ fanDeg = 30, pinch = 0 } = {}) {
@@ -51,54 +51,47 @@ function curl(w: Float32Array, mcp: number, joints: number[]) {
   return out;
 }
 
-describe('isOpenPalm', () => {
-  it('accepts a spread open hand facing the camera', () => {
-    expect(isOpenPalm(palm())).toBe(true);
-  });
-
-  it('rejects a relaxed open hand (fingers not spread), like one aiming at an object', () => {
-    expect(isOpenPalm(palm({ fanDeg: 0 }))).toBe(false);
-  });
-
-  it('accepts a slightly turned palm, rejects one turned side-on', () => {
-    expect(isOpenPalm(turned(palm(), 25))).toBe(true);
-    expect(isOpenPalm(turned(palm(), 50))).toBe(false);
-    expect(isOpenPalm(turned(palm(), -50))).toBe(false);
-  });
-
-  it('accepts the back of the hand too (left/right labels are unreliable)', () => {
-    expect(isOpenPalm(turned(palm(), 180))).toBe(true);
-  });
-
-  it('rejects a pinch, a curled finger, and a tucked thumb', () => {
-    expect(isOpenPalm(palm({ pinch: 1 }))).toBe(false);
-    expect(isOpenPalm(curl(palm(), L.RingMcp, [L.RingPip, L.RingDip, L.RingTip]))).toBe(false);
-    const tucked = palm();
-    tucked.set(tucked.subarray(L.IndexMcp * 3, L.IndexMcp * 3 + 3), L.ThumbTip * 3);
-    expect(isOpenPalm(tucked)).toBe(false);
-  });
-
-  it('accepts synthetic hands with spread fingers (either hand) and not relaxed ones', () => {
+describe('isPointing', () => {
+  it('accepts a synthetic pointing hand, either hand, however it is turned', () => {
     for (const handedness of ['Right', 'Left'] as const) {
-      expect(isOpenPalm(synthHand({ cx: 0.5, cy: 0.6, handedness, spread: 45 }).world)).toBe(true);
-      expect(isOpenPalm(synthHand({ cx: 0.5, cy: 0.6, handedness }).world)).toBe(false);
+      const w = Float32Array.from(synthHand({ cx: 0.5, cy: 0.6, handedness, point: true }).world);
+      expect(isPointing(w)).toBe(true);
+      expect(isPointing(turned(w, 70))).toBe(true);
+      expect(isPointing(turned(w, 180))).toBe(true);
     }
   });
 
-  it('rejects degenerate input', () => {
-    expect(isOpenPalm(new Float32Array(63))).toBe(false);
+  it('rejects an open hand, a fist, a pinch and degenerate input', () => {
+    expect(isPointing(synthHand({ cx: 0.5, cy: 0.6 }).world)).toBe(false);
+    const fist = curl(
+      Float32Array.from(synthHand({ cx: 0.5, cy: 0.6, point: true }).world),
+      L.IndexMcp,
+      [L.IndexPip, L.IndexDip, L.IndexTip],
+    );
+    expect(isPointing(fist)).toBe(false);
+    expect(isPointing(synthHand({ cx: 0.5, cy: 0.6, point: true, pinch: 1 }).world)).toBe(false);
+    expect(isPointing(new Float32Array(63))).toBe(false);
+  });
+
+  it('rejects two fingers up (index and middle)', () => {
+    const open = synthHand({ cx: 0.5, cy: 0.6 }).world;
+    const w = Float32Array.from(synthHand({ cx: 0.5, cy: 0.6, point: true }).world);
+    for (const j of [L.MiddlePip, L.MiddleDip, L.MiddleTip])
+      w.set(open.slice(j * 3, j * 3 + 3), j * 3);
+    expect(isPointing(w)).toBe(false);
   });
 });
 
-describe('OpenPalmDetector', () => {
+describe('PoseHoldDetector (pointing)', () => {
+  const pointing = synthHand({ cx: 0.5, cy: 0.6, point: true }).world;
   const still = (_t: number, allowed = true) => ({
-    world: palm(),
+    world: pointing,
     center: [0.5, 0.5] as const,
     allowed,
   });
 
   it('completes once after the pose is held still for 600 ms', () => {
-    const d = new OpenPalmDetector();
+    const d = new PoseHoldDetector(isPointing);
     let completed = 0;
     let last = d.update(0, still(0));
     for (let t = 33; t <= 1500; t += 33) {
@@ -114,20 +107,20 @@ describe('OpenPalmDetector', () => {
   });
 
   it('does not open while the hand is moving', () => {
-    const d = new OpenPalmDetector();
+    const d = new PoseHoldDetector(isPointing);
     for (let t = 0; t <= 1500; t += 33) {
-      const r = d.update(t, { world: palm(), center: [0.3 + t / 3000, 0.5], allowed: true });
+      const r = d.update(t, { world: pointing, center: [0.3 + t / 3000, 0.5], allowed: true });
       expect(r.completed).toBe(false);
     }
   });
 
   it('does not open while not allowed (holding something)', () => {
-    const d = new OpenPalmDetector();
+    const d = new PoseHoldDetector(isPointing);
     for (let t = 0; t <= 1500; t += 33) expect(d.update(t, still(t, false)).completed).toBe(false);
   });
 
   it('tolerates a one-frame miss but resets after a real break', () => {
-    const d = new OpenPalmDetector();
+    const d = new PoseHoldDetector(isPointing);
     let opened = false;
     for (let t = 0; t <= 900; t += 33) {
       const miss = t === 297; // one frame without the hand
@@ -136,11 +129,12 @@ describe('OpenPalmDetector', () => {
     }
     expect(opened).toBe(true);
 
-    const d2 = new OpenPalmDetector();
+    const d2 = new PoseHoldDetector(isPointing);
     let progress = 0;
     for (let t = 0; t <= 500; t += 33) progress = d2.update(t, still(t)).progress;
     expect(progress).toBeGreaterThan(0.7);
-    for (let t = 533; t <= 800; t += 33) d2.update(t, { ...still(t), world: palm({ fanDeg: 0 }) });
+    for (let t = 533; t <= 800; t += 33)
+      d2.update(t, { ...still(t), world: synthHand({ cx: 0.5, cy: 0.6 }).world });
     expect(d2.update(833, still(833)).progress).toBe(0);
   });
 });

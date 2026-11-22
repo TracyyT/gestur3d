@@ -49,8 +49,8 @@ export function SettingsPanel() {
             onChange={(v) => s.set('twoHandDepth', v)}
           />
           <Toggle
-            label="Open-palm menu"
-            hint="Hold an open hand, fingers spread, toward the camera to open the menu."
+            label="Point to open menu"
+            hint="Hold up your index finger, other fingers curled, to open the menu."
             checked={s.palmMenu}
             onChange={(v) => s.set('palmMenu', v)}
           />
