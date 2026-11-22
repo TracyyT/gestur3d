@@ -38,10 +38,13 @@ export function CameraErrorView({
   kind,
   detail,
   onRetry,
+  continueTo = '/workspace',
 }: {
   kind: CameraErrorKind;
   detail?: string;
   onRetry: () => void;
+  /** Where "Continue with mouse only" goes. */
+  continueTo?: string;
 }) {
   const c = copy[kind];
   return (
@@ -74,7 +77,7 @@ export function CameraErrorView({
         <Button variant="primary" onClick={onRetry}>
           Try again
         </Button>
-        <Link to="/workspace" className={buttonClasses('ghost')}>
+        <Link to={continueTo} className={buttonClasses('ghost')}>
           Continue with mouse only
         </Link>
       </div>
