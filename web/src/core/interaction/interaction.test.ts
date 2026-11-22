@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec3 } from './commands';
+import { inverseOf } from './history';
 import { quatFromAxisAngle, quatRotateVec3 } from '@/core/math/quat';
 import type { KeyInput } from './keyboard';
 import { keyToCommand, MOVE_STEP } from './keyboard';
@@ -12,6 +13,7 @@ import {
   SCALE_MAX,
   SCALE_MIN,
   spawnPosition,
+  MAX_STROKES,
 } from './sceneModel';
 
 const key = (k: string, mods: Partial<KeyInput> = {}): KeyInput => ({
@@ -205,5 +207,58 @@ describe('setColor', () => {
     m = applyCommand(m, { type: 'setColor', id: 'obj-1', color: null });
     expect('color' in m.objects[0]!).toBe(false);
     expect(applyCommand(m, { type: 'setColor', id: 'nope', color: 'cyan' })).toBe(m);
+  });
+});
+
+describe('addStroke', () => {
+  const circle = (n = 24, r = 1, cx = 0, cy = 1): Vec3[] =>
+    Array.from({ length: n }, (_, i) => {
+      const a = (i / n) * Math.PI * 2;
+      return [cx + Math.cos(a) * r, cy + Math.sin(a) * r, 0] as Vec3;
+    });
+
+  it('adds a stroke centered on its points, without changing the selection', () => {
+    let m = createInitialScene();
+    m = applyCommand(m, { type: 'select', id: 'obj-1' });
+    m = applyCommand(m, { type: 'addStroke', points: circle(24, 1, 0.5, 1), color: 'violet' });
+    const s = m.objects.at(-1)!;
+    expect(s.kind).toBe('stroke');
+    expect(s.color).toBe('violet');
+    expect(s.position[0]).toBeCloseTo(0.5);
+    expect(s.position[1]).toBeCloseTo(1);
+    expect(s.points).toHaveLength(24);
+    expect(s.points![0]![0]).toBeCloseTo(1);
+    expect(m.selectedId).toBe('obj-1');
+  });
+
+  it('ignores strokes that are too short or not finite', () => {
+    const m = createInitialScene();
+    expect(applyCommand(m, { type: 'addStroke', points: [[0, 0, 0]] })).toBe(m);
+    expect(
+      applyCommand(m, {
+        type: 'addStroke',
+        points: [
+          [0, 0, 0],
+          [NaN, 0, 0],
+        ],
+      }),
+    ).toBe(m);
+  });
+
+  it(`keeps at most ${MAX_STROKES} drawings, dropping the oldest`, () => {
+    let m = createInitialScene();
+    for (let i = 0; i < MAX_STROKES + 3; i++)
+      m = applyCommand(m, { type: 'addStroke', points: circle(4) });
+    const strokes = m.objects.filter((o) => o.kind === 'stroke');
+    expect(strokes).toHaveLength(MAX_STROKES);
+    expect(strokes[0]!.id).toBe('obj-7');
+    expect(m.objects.filter((o) => o.kind !== 'stroke')).toHaveLength(3);
+  });
+
+  it('can be undone', () => {
+    const m = createInitialScene();
+    const cmd = { type: 'addStroke', points: circle() } as const;
+    const inv = inverseOf(m, cmd)!;
+    expect(applyCommand(applyCommand(m, cmd), inv).objects).toEqual(m.objects);
   });
 });

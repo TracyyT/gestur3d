@@ -6,6 +6,7 @@ import { ReplayHandSource } from '@/core/vision/replaySource';
 import type { Handedness } from '@/core/vision/types';
 import { visibleSceneRect } from '@/scene/framing';
 import { useHudLayout } from '@/stores/hudLayout';
+import type { Vec3 } from '@/core/interaction/commands';
 import { useScene } from '@/stores/scene';
 import { useSettings } from '@/stores/settings';
 import { handRuntime } from './handRuntime';
@@ -177,6 +178,9 @@ export function installTestHooks() {
         scale: o.scale,
       })),
     twoHand: () => handRuntime.twoHand.map((t) => ({ ...t })),
+    /** Add a drawing directly (world points), as if it had been drawn. */
+    addStroke: (points: Vec3[]) =>
+      useScene.getState().dispatch({ type: 'addStroke', points }, 'ui'),
     /** Two-hand mode changes seen by the engine (every detection frame, not just rendered ones). */
     twoHandModes: () => [...handRuntime.twoHandModes],
     /** Script time (ms) of the last detection frame the engine processed, during replay. */

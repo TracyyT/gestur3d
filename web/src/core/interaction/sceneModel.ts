@@ -1,5 +1,5 @@
 import { QUAT_IDENTITY, quatFromEuler, quatMultiply, quatNormalize } from '@/core/math/quat';
-import type { Command, ObjectKind, SceneModel, SceneObject, Vec3 } from './commands';
+import type { Command, ObjectKind, SceneModel, SceneObject, Vec3, ShapeKind } from './commands';
 
 export const SCALE_MIN = 0.3;
 export const SCALE_MAX = 3;
@@ -29,10 +29,24 @@ export const KIND_LABEL: Record<ObjectKind, string> = {
   capsule: 'Capsule',
   helix: 'Helix',
   gyroscope: 'Gyroscope',
+  stroke: 'Drawing',
 };
 
-/** Every kind, in the order the add menus show them. */
-export const OBJECT_KINDS = Object.keys(KIND_LABEL) as ObjectKind[];
+/** Every shape kind, in the order the add menus show them. */
+export const OBJECT_KINDS: ShapeKind[] = [
+  'sphere',
+  'cube',
+  'sculpture',
+  'ring',
+  'pyramid',
+  'crystal',
+  'capsule',
+  'helix',
+  'gyroscope',
+];
+
+/** Drawings kept at most; past this the oldest is removed. */
+export const MAX_STROKES = 40;
 
 export function createInitialScene(): SceneModel {
   const objects: SceneObject[] = [
@@ -195,6 +209,36 @@ export function applyCommand(model: SceneModel, cmd: Command): SceneModel {
         scale: 1,
       };
       return { objects: [...model.objects, obj], selectedId: id, nextId: model.nextId + 1 };
+    }
+    case 'addStroke': {
+      const pts = cmd.points;
+      if (pts.length < 2 || !pts.every((p) => p.every(Number.isFinite))) return model;
+      // Center the stroke on its points' average, so it moves, turns and
+      // scales around its middle like any other object.
+      const c: Vec3 = [0, 0, 0];
+      for (const p of pts) for (let i = 0; i < 3; i++) c[i]! += p[i]! / pts.length;
+      const position = clampPosition(c);
+      const id = `obj-${model.nextId}`;
+      const stroke: SceneObject = {
+        id,
+        kind: 'stroke',
+        position,
+        rotation: [...QUAT_IDENTITY],
+        scale: 1,
+        points: pts.map((p) => [p[0] - c[0], p[1] - c[1], p[2] - c[2]] as Vec3),
+        ...(cmd.color ? { color: cmd.color } : {}),
+      };
+      let objects = [...model.objects, stroke];
+      const strokes = objects.filter((o) => o.kind === 'stroke');
+      if (strokes.length > MAX_STROKES) {
+        const oldest = strokes[0]!.id;
+        objects = objects.filter((o) => o.id !== oldest);
+      }
+      return {
+        objects,
+        selectedId: objects.some((o) => o.id === model.selectedId) ? model.selectedId : null,
+        nextId: model.nextId + 1,
+      };
     }
     case 'remove': {
       if (!model.objects.some((o) => o.id === cmd.id)) return model;
