@@ -66,7 +66,8 @@ export class SessionLog {
   constructor(options: SessionLogOptions = {}) {
     this.now = options.now ?? (() => performance.now());
     this.limit = options.limit ?? 20_000;
-    this.mergeGapMs = options.mergeGapMs ?? 400;
+    // Generous, so stalled frames (slow GPUs) don't split one drag in two.
+    this.mergeGapMs = options.mergeGapMs ?? 1500;
     this.start = this.now();
     this.startedAt = new Date().toISOString();
   }

@@ -48,7 +48,7 @@ describe('SessionLog', () => {
     move();
     c.advance(30);
     move();
-    c.advance(500); // pause
+    c.advance(500); // pause longer than the 400 ms gap set here
     move();
     move('obj-2');
     move('obj-2', 'mouse');
