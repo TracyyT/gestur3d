@@ -43,9 +43,9 @@ describe('radial menu hit testing', () => {
 
   it('a short outer ring fans out around its parent; elsewhere the inner sector wins', () => {
     const colors = { parent: 2, count: 3 };
-    expect(hitTest(...at(120, 150), colors)).toEqual({ ring: 'outer', index: 1 });
-    expect(hitTest(...at(120 - 36, 150), colors)).toEqual({ ring: 'outer', index: 0 });
-    expect(hitTest(...at(300, 150), colors)).toEqual({ ring: 'inner', index: 5 });
+    expect(hitTest(...at(120, 200), colors)).toEqual({ ring: 'outer', index: 1 });
+    expect(hitTest(...at(120 - 36, 200), colors)).toEqual({ ring: 'outer', index: 0 });
+    expect(hitTest(...at(300, 200), colors)).toEqual({ ring: 'inner', index: 5 });
   });
 
   describe('sticky highlight', () => {

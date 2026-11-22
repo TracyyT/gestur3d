@@ -18,9 +18,9 @@ export const MENU_ACTIONS: readonly MenuAction[] = [
 
 export const MENU_GEOMETRY = {
   /** Within this radius (px) nothing is highlighted: pinching there cancels. */
-  deadZone: 38,
-  innerOuter: 118,
-  outerOuter: 188,
+  deadZone: 50,
+  innerOuter: 160,
+  outerOuter: 250,
 } as const;
 
 /** Angle (radians, screen y down, 0 = up, clockwise) of inner sector `i`'s center. */

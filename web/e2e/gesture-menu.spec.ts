@@ -31,8 +31,8 @@ test('pointing (index up) held still opens the menu; pointing up and out, then p
   page,
 }) => {
   await open(page);
-  const add = await above(page, SPOT, 75); // the Add sector
-  const sphere = await above(page, SPOT, 150); // first outer item: Sphere
+  const add = await above(page, SPOT, 100); // the Add sector
+  const sphere = await above(page, SPOT, 205); // first outer item: Sphere
   const keys: HandKey[] = [
     { at: 0, ...SPOT, pinch: 0 },
     { at: 300, ...SPOT, pinch: 0 },

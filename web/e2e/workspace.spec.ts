@@ -209,8 +209,8 @@ test.describe('radial menu', () => {
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
     await page.mouse.move(cx, cy - 75); // Add
-    await page.mouse.move(cx, cy - 150); // first outer item: Sphere
-    await page.mouse.click(cx, cy - 150);
+    await page.mouse.move(cx, cy - 205); // first outer item: Sphere
+    await page.mouse.click(cx, cy - 205);
     await expect(
       page.getByRole('list', { name: 'Objects in the scene' }).getByRole('listitem'),
     ).toHaveCount(4);
