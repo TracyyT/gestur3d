@@ -13,7 +13,7 @@ import {
   type BufferGeometry,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { HoloColor, ObjectKind } from '@/core/interaction/commands';
+import type { HoloColor, ShapeKind } from '@/core/interaction/commands';
 import { palette } from '@/ui/theme';
 
 /** How one kind of holographic object looks. */
@@ -68,7 +68,7 @@ function gyroscopeGeometry() {
   return mergeGeometries([outer, middle, inner])!;
 }
 
-export const KINDS: Record<ObjectKind, KindDefinition> = {
+export const KINDS: Record<ShapeKind, KindDefinition> = {
   sphere: {
     color: palette.cyan,
     rim: palette.violet,
@@ -151,14 +151,14 @@ export const COLOR_STYLE: Record<HoloColor, { color: string; rim: string }> = {
   white: { color: palette.ink1, rim: palette.cyan },
 };
 
-const cache = new Map<ObjectKind, { body: BufferGeometry; edges: BufferGeometry | null }>();
+const cache = new Map<ShapeKind, { body: BufferGeometry; edges: BufferGeometry | null }>();
 
 /**
  * Geometry for a kind, built once and shared by every object of that kind.
  * Kept for the page's lifetime (one small set per kind), so it's never
  * disposed by individual objects.
  */
-export function kindGeometry(kind: ObjectKind) {
+export function kindGeometry(kind: ShapeKind) {
   let g = cache.get(kind);
   if (!g) {
     g = KINDS[kind].build();

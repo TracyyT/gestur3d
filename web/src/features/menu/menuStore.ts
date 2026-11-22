@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { HoloColor, ObjectKind } from '@/core/interaction/commands';
+import type { HoloColor, ShapeKind } from '@/core/interaction/commands';
 import {
   MENU_ACTIONS,
   hitTest,
@@ -14,7 +14,7 @@ export type MenuOpener = 'keyboard' | 'hand';
 export const COLOR_CHOICES: readonly HoloColor[] = ['cyan', 'violet', 'white'];
 
 /** Which inner sectors open an outer ring, and what's on it. */
-export function outerItems(action: MenuAction): readonly (ObjectKind | HoloColor)[] | null {
+export function outerItems(action: MenuAction): readonly (ShapeKind | HoloColor)[] | null {
   if (action === 'add') return OBJECT_KINDS;
   if (action === 'color') return COLOR_CHOICES;
   return null;
@@ -65,7 +65,7 @@ function run(action: MenuAction, outerIndex: number | null) {
   const items = outerItems(action);
   if (items && outerIndex !== null) {
     const choice = items[outerIndex]!;
-    if (action === 'add') scene.dispatch({ type: 'add', kind: choice as ObjectKind }, 'ui');
+    if (action === 'add') scene.dispatch({ type: 'add', kind: choice as ShapeKind }, 'ui');
     if (action === 'color' && scene.selectedId)
       scene.dispatch({ type: 'setColor', id: scene.selectedId, color: choice as HoloColor }, 'ui');
     return;

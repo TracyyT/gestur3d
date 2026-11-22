@@ -7,7 +7,8 @@ import type { Quat } from '@/core/math/quat';
 
 export type Vec3 = [number, number, number];
 
-export type ObjectKind =
+/** Geometric shapes (the Add menu). */
+export type ShapeKind =
   | 'sphere'
   | 'cube'
   | 'sculpture'
@@ -17,6 +18,9 @@ export type ObjectKind =
   | 'capsule'
   | 'helix'
   | 'gyroscope';
+
+/** Everything that can be in the scene: shapes, plus air-drawn strokes. */
+export type ObjectKind = ShapeKind | 'stroke';
 
 /** Color choices for an object (otherwise its kind's own colors). */
 export type HoloColor = 'cyan' | 'violet' | 'white';
@@ -35,7 +39,9 @@ export type Command =
   | { type: 'scaleBy'; id: string; factor: number }
   /** null = back to the kind's own colors. */
   | { type: 'setColor'; id: string; color: HoloColor | null }
-  | { type: 'add'; kind: ObjectKind }
+  | { type: 'add'; kind: ShapeKind }
+  /** A finished air-drawn stroke, in world coordinates. */
+  | { type: 'addStroke'; points: Vec3[]; color?: HoloColor }
   | { type: 'remove'; id: string }
   /** Put a removed object back where it was (used by Undo). */
   | { type: 'restore'; object: SceneObject; index: number; selected: boolean }
@@ -50,6 +56,8 @@ export interface SceneObject {
   scale: number;
   /** Chosen color; absent = the kind's own colors. */
   color?: HoloColor;
+  /** Stroke points relative to `position` (kind 'stroke' only). */
+  points?: Vec3[];
 }
 
 export interface SceneModel {

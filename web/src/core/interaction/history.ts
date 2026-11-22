@@ -12,6 +12,7 @@ export const UNDO_LIMIT = 50;
 export function inverseOf(before: SceneModel, cmd: Command): Command | null {
   switch (cmd.type) {
     case 'add':
+    case 'addStroke':
       return { type: 'remove', id: `obj-${before.nextId}` };
     case 'remove': {
       const index = before.objects.findIndex((o) => o.id === cmd.id);

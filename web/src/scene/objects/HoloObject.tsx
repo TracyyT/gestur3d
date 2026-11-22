@@ -8,6 +8,7 @@ import {
   Vector3,
   type Group,
   type Mesh,
+  type MeshBasicMaterial,
   type ShaderMaterial,
 } from 'three';
 import type { InputSource, SceneObject, Vec3 } from '@/core/interaction/commands';
@@ -15,6 +16,7 @@ import { handRuntime } from '@/features/hands/handRuntime';
 import { createHoloMaterial } from '@/scene/materials/holoMaterial';
 import { objectRegistry } from '@/scene/objectRegistry';
 import { COLOR_STYLE, KINDS, kindGeometry } from './kinds';
+import { createPickMaterial, createStrokeMaterial, strokeGeometry } from './stroke';
 import { FLOOR_Y } from '@/scene/constants';
 import { useScene } from '@/stores/scene';
 import { palette } from '@/ui/theme';
@@ -40,6 +42,7 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
   /** Inner group for the kind's idle spin, so the model's rotation stays untouched. */
   const spin = useRef<Group>(null);
   const body = useRef<Mesh>(null);
+  const lineRef = useRef<Mesh>(null);
   const ring = useRef<Mesh>(null);
   const hovered = useRef(false);
   const drag = useRef<{
@@ -55,23 +58,46 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
   const dispatch = useScene((s) => s.dispatch);
   const setMode = useScene((s) => s.setMode);
 
-  const kind = KINDS[object.kind];
-  const { body: kindBody, edges } = kindGeometry(object.kind);
-  const style = object.color ? COLOR_STYLE[object.color] : kind;
+  const isStroke = object.kind === 'stroke';
+  const kind = object.kind === 'stroke' ? null : KINDS[object.kind];
+  const style = object.color ? COLOR_STYLE[object.color] : (kind ?? COLOR_STYLE.cyan);
+
+  // Shapes share geometry per kind; a stroke has its own line and pick box.
+  const stroke = useMemo(
+    () => (isStroke ? strokeGeometry(object.points ?? []) : null),
+    [isStroke, object.points],
+  );
+  const shape = object.kind === 'stroke' ? null : kindGeometry(object.kind);
+  const kindBody = stroke ? stroke.pick : shape!.body;
+  const edges = shape?.edges ?? null;
+
   const material = useMemo(
     () =>
-      createHoloMaterial({
-        color: style.color,
-        rimColor: style.rim,
-        opacity: kind.opacity,
-        scanDensity: 4,
-      }),
-    [style, kind.opacity],
+      isStroke
+        ? createPickMaterial()
+        : createHoloMaterial({
+            color: style.color,
+            rimColor: style.rim,
+            opacity: kind!.opacity,
+            scanDensity: 4,
+          }),
+    [isStroke, style, kind],
+  );
+  const strokeMaterial = useMemo(
+    () => (isStroke ? createStrokeMaterial(style.color) : null),
+    [isStroke, style],
   );
   const ringColor = useMemo(() => new Color(palette.cyan).multiplyScalar(1.4), []);
 
-  // Geometry is shared per kind (see kinds.ts); only the material is ours.
   useEffect(() => () => material.dispose(), [material]);
+  useEffect(
+    () => () => {
+      stroke?.tube.dispose();
+      stroke?.pick.dispose();
+    },
+    [stroke],
+  );
+  useEffect(() => () => strokeMaterial?.dispose(), [strokeMaterial]);
 
   // Register the pickable mesh so hands can raycast against it.
   useEffect(() => {
@@ -105,12 +131,20 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
     }
 
     // Idle spin, paused while held or dragged, and with reduced motion.
-    if (kind.spin && spin.current && !instant && !handHeld && !drag.current) {
+    if (kind?.spin && spin.current && !instant && !handHeld && !drag.current) {
       spin.current.rotation.y += kind.spin * delta;
     }
 
+    // Strokes brighten and thicken a little when held, selected or hovered.
+    if (lineRef.current) {
+      const sm = lineRef.current.material as MeshBasicMaterial;
+      const handHover = handRuntime.hovered.has(object.id);
+      const on = handHeld || selected || hovered.current || handHover;
+      sm.opacity += ((on ? 1 : 0.8) - sm.opacity) * Math.min(1, delta * 10);
+    }
+
     const m = body.current?.material as ShaderMaterial | undefined;
-    if (m?.uniforms.uTime && m.uniforms.uHighlight) {
+    if (m?.uniforms?.uTime && m.uniforms.uHighlight) {
       m.uniforms.uTime.value = state.clock.elapsedTime;
       const handHover = handRuntime.hovered.has(object.id);
       const target = handHeld ? 1.5 : selected ? 1 : hovered.current || handHover ? 0.45 : 0;
@@ -222,6 +256,14 @@ export function HoloObject({ object, selected, instant, onHoverChange }: Props) 
           >
             <primitive object={kindBody} attach="geometry" />
           </mesh>
+          {stroke && strokeMaterial && (
+            <mesh
+              ref={lineRef}
+              geometry={stroke.tube}
+              material={strokeMaterial}
+              raycast={() => null}
+            />
+          )}
           {edges && (
             <lineSegments geometry={edges} raycast={() => null}>
               <lineBasicMaterial

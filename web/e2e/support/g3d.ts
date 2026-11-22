@@ -43,6 +43,7 @@ export interface G3D {
   playHold(uv: UV, ms: number, jitter?: number): Promise<void>;
   playTwoHand(s: { right: HandKey[]; left: HandKey[] }): Promise<void>;
   playHand(keys: HandKey[], handedness?: Handedness): Promise<void>;
+  addStroke(points: Vec3[]): void;
 }
 
 declare global {
