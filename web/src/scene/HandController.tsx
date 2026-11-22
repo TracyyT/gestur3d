@@ -73,7 +73,7 @@ export function HandController() {
       engine.reset();
       gestureMenu.reset();
       drawing.reset();
-      drawRuntime.reset();
+      drawRuntime.resetHands();
       shown.clear();
       handRuntime.reset();
     };
@@ -208,9 +208,8 @@ export function HandController() {
         scene.dispatch({ type: 'addStroke', points, color: draw.color }, 'gesture');
       }
       if (u.changed) {
-        drawRuntime.live.clear();
+        drawRuntime.resetHands();
         for (const [id, b] of drawing.live) drawRuntime.live.set(id, b.points);
-        drawRuntime.version++;
       }
     };
 

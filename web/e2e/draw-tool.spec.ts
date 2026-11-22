@@ -105,3 +105,55 @@ test('the radial menu turns Draw on, clears drawings, and Undo brings them back'
   await page.keyboard.press('Enter');
   await expect.poll(strokes).toBe(2);
 });
+
+test.describe('mouse drawing', () => {
+  /** Drag the mouse along a wavy path between two scene-relative points. */
+  async function drag(page: Page, from: { u: number; v: number }, to: { u: number; v: number }) {
+    const r = await page.evaluate(() => window.__G3D__.sceneRect());
+    const at = (u: number, v: number) => [r.left + u * r.width, r.top + v * r.height] as const;
+    await page.mouse.move(...at(from.u, from.v));
+    await page.mouse.down();
+    for (let i = 1; i <= 20; i++) {
+      const t = i / 20;
+      await page.mouse.move(
+        ...at(from.u + (to.u - from.u) * t, from.v + (to.v - from.v) * t + 0.03 * Math.sin(t * 6)),
+      );
+      await page.waitForTimeout(16);
+    }
+    await page.mouse.up();
+  }
+
+  test('with Draw on, dragging empty space draws instead of orbiting', async ({ page }) => {
+    await open(page);
+    const before = await count(page);
+    const sphere = (await page.evaluate(() => window.__G3D__.objectUV('obj-1')))!;
+    await page.getByRole('button', { name: 'Draw' }).click();
+    await drag(page, { u: 0.3, v: 0.75 }, { u: 0.55, v: 0.75 });
+    await expect.poll(() => count(page)).toBe(before + 1);
+    // The view didn't orbit.
+    const after = (await page.evaluate(() => window.__G3D__.objectUV('obj-1')))!;
+    expect(Math.abs(after.u - sphere.u)).toBeLessThan(0.005);
+  });
+
+  test('with Draw on, dragging an object still moves it', async ({ page }) => {
+    await open(page);
+    const before = await count(page);
+    await page.getByRole('button', { name: 'Draw' }).click();
+    const from = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
+    await drag(page, from, { u: from.u + 0.15, v: from.v });
+    const end = (await page.evaluate(() => window.__G3D__.objectUV('obj-2')))!;
+    expect(end.u - from.u).toBeGreaterThan(0.08);
+    expect(await count(page)).toBe(before);
+  });
+
+  test('with Draw off, dragging empty space orbits and draws nothing', async ({ page }) => {
+    await open(page);
+    const before = await count(page);
+    const sphere = (await page.evaluate(() => window.__G3D__.objectUV('obj-1')))!;
+    await drag(page, { u: 0.3, v: 0.75 }, { u: 0.55, v: 0.75 });
+    await page.waitForTimeout(300);
+    expect(await count(page)).toBe(before);
+    const after = (await page.evaluate(() => window.__G3D__.objectUV('obj-1')))!;
+    expect(Math.abs(after.u - sphere.u)).toBeGreaterThan(0.01);
+  });
+});

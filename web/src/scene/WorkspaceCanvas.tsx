@@ -3,12 +3,14 @@ import { Canvas } from '@react-three/fiber';
 import { Bloom, EffectComposer } from '@react-three/postprocessing';
 import { useCallback, useState } from 'react';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { useDraw } from '@/features/drawing/drawStore';
 import { useScene } from '@/stores/scene';
 import { useSettings } from '@/stores/settings';
 import { HoloLab } from './environments/HoloLab';
 import { FrameProbe } from './FrameProbe';
 import { HandController } from './HandController';
 import { LiveStrokes } from './LiveStrokes';
+import { MouseDrawing } from './MouseDrawing';
 import { PanelAwareFraming } from './PanelAwareFraming';
 import { HoloObject } from './objects/HoloObject';
 
@@ -44,6 +46,7 @@ export default function WorkspaceCanvas() {
   const reducedMotion = useReducedMotion();
   const particleDensity = useSettings((s) => s.particleDensity);
   const quality = useSettings((s) => s.visualQuality);
+  const drawing = useDraw((s) => s.active);
   const selectedId = useScene((s) => s.selectedId);
   const dispatch = useScene((s) => s.dispatch);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -69,12 +72,15 @@ export default function WorkspaceCanvas() {
       <PanelAwareFraming instant={reducedMotion} />
       <HandController />
       <LiveStrokes />
+      <MouseDrawing />
       <HoloLab particleDensity={particleDensity} />
       <SceneObjects instant={reducedMotion} onHoverChange={onHoverChange} />
       <OrbitControls
         makeDefault
         target={[0, 0.15, 0]}
         enablePan={false}
+        // With Draw on, dragging empty space draws instead of orbiting.
+        enableRotate={!drawing}
         // Scrolling over the selected object scales it instead of zooming.
         enableZoom={!(hoveredId && hoveredId === selectedId)}
         enableDamping={!reducedMotion}
