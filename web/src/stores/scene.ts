@@ -18,6 +18,17 @@ interface SceneStore extends SceneModel {
   setMode: (mode: InteractionMode, source?: InputSource) => void;
 }
 
+export type SceneChange =
+  { kind: 'command'; cmd: Command; source: InputSource } | { kind: 'undo'; source: InputSource };
+
+const changeListeners = new Set<(change: SceneChange) => void>();
+
+/** Hear every command that changed the scene, and every undo (e.g. for the session log). */
+export function onSceneChange(fn: (change: SceneChange) => void): () => void {
+  changeListeners.add(fn);
+  return () => changeListeners.delete(fn);
+}
+
 /** Scene state. Every change goes through dispatch → applyCommand. */
 export const useScene = create<SceneStore>()((set, get) => ({
   ...createInitialScene(),
@@ -40,6 +51,7 @@ export const useScene = create<SceneStore>()((set, get) => ({
             ? { undoStack: [...undoStack, inverse].slice(-UNDO_LIMIT) }
             : {}),
       });
+      for (const fn of changeListeners) fn({ kind: 'command', cmd, source });
     }
   },
   undo: (source) => {
@@ -48,6 +60,7 @@ export const useScene = create<SceneStore>()((set, get) => ({
     if (!inverse) return false;
     const next = applyCommand({ objects, selectedId, nextId }, inverse);
     set({ ...next, undoStack: undoStack.slice(0, -1), lastSource: source });
+    for (const fn of changeListeners) fn({ kind: 'undo', source });
     return true;
   },
   setMode: (mode, source) => {

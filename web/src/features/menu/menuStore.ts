@@ -63,9 +63,19 @@ interface MenuState {
 
 const NONE: MenuHit = { ring: 'none' };
 
+const actionListeners = new Set<(action: MenuAction, choice?: string) => void>();
+
+/** Hear each menu action as it runs (e.g. for the session log). */
+export function onMenuAction(fn: (action: MenuAction, choice?: string) => void): () => void {
+  actionListeners.add(fn);
+  return () => actionListeners.delete(fn);
+}
+
 function run(action: MenuAction, outerIndex: number | null) {
   const scene = useScene.getState();
   const items = outerItems(action);
+  const picked = items && outerIndex !== null ? String(items[outerIndex]) : undefined;
+  for (const fn of actionListeners) fn(action, picked);
   if (items && outerIndex !== null) {
     const choice = items[outerIndex]!;
     if (action === 'add') scene.dispatch({ type: 'add', kind: choice as ShapeKind }, 'ui');

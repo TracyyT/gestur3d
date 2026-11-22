@@ -10,6 +10,7 @@ import type { Vec3 } from '@/core/interaction/commands';
 import { useScene } from '@/stores/scene';
 import { useSettings } from '@/stores/settings';
 import { handRuntime } from './handRuntime';
+import { sessionLog } from '@/features/session/session';
 import { useHandTracking } from './handTrackingStore';
 
 interface UV {
@@ -180,6 +181,7 @@ export function installTestHooks() {
       })),
     twoHand: () => handRuntime.twoHand.map((t) => ({ ...t })),
     /** Add a drawing directly (world points), as if it had been drawn. */
+    session: () => sessionLog.toJSON().events,
     addStroke: (points: Vec3[]) =>
       useScene.getState().dispatch({ type: 'addStroke', points }, 'ui'),
     /** Two-hand mode changes seen by the engine (every detection frame, not just rendered ones). */
