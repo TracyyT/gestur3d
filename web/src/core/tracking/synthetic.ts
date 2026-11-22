@@ -44,8 +44,8 @@ export interface SynthHandOptions {
   handedness?: Handedness;
   /** Camera width / height. */
   aspect?: number;
-  /** Fan the fingers apart by this many degrees (index to pinky), like a deliberate open palm. */
-  spread?: number;
+  /** Point: index finger extended, middle, ring and pinky folded toward the wrist. */
+  point?: boolean;
 }
 
 /** Build a TrackedHand. In the raw frame a right hand's thumb points to +x. */
@@ -56,25 +56,18 @@ export function synthHand({
   pinch = 0,
   handedness = 'Right',
   aspect = 16 / 9,
-  spread = 0,
+  point = false,
 }: SynthHandOptions): TrackedHand {
   const s = handedness === 'Right' ? 1 : -1;
   const pts = OPEN.map(([x, y]): P => [x * s, y]);
-  if (spread) {
-    // Index leans toward the thumb, pinky away, each by half the spread.
-    const fan = (mcp: number, joints: number[], deg: number) => {
-      const a = ((deg * Math.PI) / 180) * s;
-      const [cx, cy] = pts[mcp]!;
-      for (const j of joints) {
-        const [x, y] = pts[j]!;
-        pts[j] = [
-          cx + (x - cx) * Math.cos(a) - (y - cy) * Math.sin(a),
-          cy + (x - cx) * Math.sin(a) + (y - cy) * Math.cos(a),
-        ];
-      }
-    };
-    fan(5, [6, 7, 8], spread / 2);
-    fan(17, [18, 19, 20], -spread / 2);
+  if (point) {
+    // Fold middle (9), ring (13) and pinky (17): DIP and tip back toward the wrist.
+    for (const mcp of [9, 13, 17]) {
+      const [mx, my] = pts[mcp]!;
+      const [wx, wy] = pts[0]!;
+      pts[mcp + 2] = [mx + (wx - mx) * 0.15, my + (wy - my) * 0.15];
+      pts[mcp + 3] = [mx + (wx - mx) * 0.35, my + (wy - my) * 0.35];
+    }
   }
   const meet: P = [0.55 * s, -1.25];
   pts[4] = lerp(pts[4]!, [meet[0] + 0.03 * s, meet[1] + 0.02], pinch);

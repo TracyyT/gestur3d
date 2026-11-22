@@ -33,7 +33,7 @@ const colorFor = (p: { handedness: HandPointer['handedness'] }) =>
  * grabbing  solid core + ring, and a tether to the held object's center
  * released  short expanding ripple
  * lost      dashed ghost that fades over the grace period
- * open palm a ring around the cursor fills while the palm is held (radial menu)
+ * pointing  a ring around the cursor fills while pointing is held (radial menu)
  *
  * Two-hand grab: a glowing line between the hands with a dot at the pivot
  * (their midpoint) instead of the tethers, an arc showing the turn since the
@@ -348,9 +348,9 @@ export function HandCursorOverlay() {
           ctx.restore();
         }
 
-        // Open palm held toward the camera: a ring fills until the menu opens.
-        const palm = handRuntime.palmProgress.get(p.id) ?? 0;
-        if (palm > 0.08) {
+        // Pointing held still: a ring fills until the menu opens.
+        const hold = handRuntime.menuProgress.get(p.id) ?? 0;
+        if (hold > 0.08) {
           ctx.save();
           ctx.globalAlpha = 0.9 * appear;
           ctx.strokeStyle = palette.ink1;
@@ -359,7 +359,7 @@ export function HandCursorOverlay() {
           ctx.lineWidth = 2.5;
           ctx.lineCap = 'round';
           ctx.beginPath();
-          ctx.arc(x, y, r + 9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * palm);
+          ctx.arc(x, y, r + 9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * hold);
           ctx.stroke();
           ctx.restore();
         }

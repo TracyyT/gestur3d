@@ -1,7 +1,6 @@
 import { HoldTracker, type HoldState } from './holdTracker';
-import { isOpenPalm } from './rules/openPalm';
 
-export interface OpenPalmInput {
+export interface PoseHoldInput {
   /** World landmarks (63 values). */
   world: ArrayLike<number>;
   /** A point that moves with the hand (e.g. the cursor anchor), camera-normalized. */
@@ -10,7 +9,7 @@ export interface OpenPalmInput {
   allowed: boolean;
 }
 
-export interface OpenPalmOptions {
+export interface PoseHoldOptions {
   holdMs: number;
   /** Short dropouts (a frame or two not matching) don't reset the hold. */
   graceMs: number;
@@ -18,30 +17,32 @@ export interface OpenPalmOptions {
   maxSpeed: number;
 }
 
-export const DEFAULT_OPEN_PALM_OPTIONS: OpenPalmOptions = {
+export const DEFAULT_POSE_HOLD_OPTIONS: PoseHoldOptions = {
   holdMs: 600,
   graceMs: 120,
   maxSpeed: 0.2,
 };
 
 /**
- * Turns per-frame open-palm checks into a deliberate hold: the pose, held
- * nearly still, for `holdMs`. `progress` drives the hold ring; `completed` is
+ * Turns a per-frame pose check (e.g. `isPointing`) into a deliberate hold: the
+ * pose, held nearly still, for `holdMs`. `progress` drives the hold ring; `completed` is
  * true once, when the menu should open. After that the hand has to leave the
  * pose before it can fire again.
  */
-export class OpenPalmDetector {
-  private readonly opts: OpenPalmOptions;
+export class PoseHoldDetector {
+  private readonly opts: PoseHoldOptions;
+  private readonly pose: (world: ArrayLike<number>) => boolean;
   private readonly hold: HoldTracker;
   private last: { t: number; x: number; y: number } | null = null;
   private speed = 0;
 
-  constructor(opts: Partial<OpenPalmOptions> = {}) {
-    this.opts = { ...DEFAULT_OPEN_PALM_OPTIONS, ...opts };
+  constructor(pose: (world: ArrayLike<number>) => boolean, opts: Partial<PoseHoldOptions> = {}) {
+    this.pose = pose;
+    this.opts = { ...DEFAULT_POSE_HOLD_OPTIONS, ...opts };
     this.hold = new HoldTracker(this.opts.holdMs, this.opts.graceMs);
   }
 
-  update(now: number, input: OpenPalmInput | null): HoldState & { posing: boolean } {
+  update(now: number, input: PoseHoldInput | null): HoldState & { posing: boolean } {
     let posing = false;
     if (input) {
       const [x, y] = input.center;
@@ -51,7 +52,7 @@ export class OpenPalmDetector {
         this.speed += (v - this.speed) * 0.5;
       }
       this.last = { t: now, x, y };
-      posing = input.allowed && this.speed < this.opts.maxSpeed && isOpenPalm(input.world);
+      posing = input.allowed && this.speed < this.opts.maxSpeed && this.pose(input.world);
     } else {
       this.last = null;
       this.speed = 0;

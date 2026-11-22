@@ -9,7 +9,7 @@ export interface HandKey extends UV {
   pinch: number;
   visible?: boolean;
   size?: number;
-  spread?: number;
+  point?: boolean;
 }
 
 export interface G3D {

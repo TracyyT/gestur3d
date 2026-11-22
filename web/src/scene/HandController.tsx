@@ -15,8 +15,8 @@ import { useHandTracking } from '@/features/hands/handTrackingStore';
 import { useHudLayout } from '@/stores/hudLayout';
 import { useScene, type InteractionMode } from '@/stores/scene';
 import { useSettings } from '@/stores/settings';
-import { PalmMenuController } from '@/features/menu/palmMenu';
-import { isOpenHand } from '@/core/gestures/rules/openPalm';
+import { GestureMenuController } from '@/features/menu/gestureMenu';
+import { isOpenHand } from '@/core/gestures/rules/handPoses';
 import { useMenu } from '@/features/menu/menuStore';
 import { visibleSceneRect } from './framing';
 import { objectRegistry } from './objectRegistry';
@@ -35,7 +35,7 @@ export function HandController() {
   const camera = useThree((s) => s.camera);
   const tracker = useMemo(() => new HandTracker(), []);
   const engine = useMemo(() => new HandInteractionEngine(), []);
-  const palmMenu = useMemo(() => new PalmMenuController(), []);
+  const gestureMenu = useMemo(() => new GestureMenuController(), []);
   const queue = useRef<HandFrame[]>([]);
   const display = useRef(new Map<number, { x: number; y: number }>());
   const config = useRef('');
@@ -68,11 +68,11 @@ export function HandController() {
       queue.current = [];
       tracker.reset();
       engine.reset();
-      palmMenu.reset();
+      gestureMenu.reset();
       shown.clear();
       handRuntime.reset();
     };
-  }, [source, tracker, engine, palmMenu]);
+  }, [source, tracker, engine, gestureMenu]);
 
   // Expose projection for the cursor overlay's tether line and test hooks.
   useEffect(() => {
@@ -192,7 +192,7 @@ export function HandController() {
     for (const f of batch) {
       const frameTracks = tracker.update(f, aspect);
       result = run(f.timestamp, toInputs(frameTracks, true));
-      palmMenu.update(f.timestamp, frameTracks, result, rect, settings.palmMenu);
+      gestureMenu.update(f.timestamp, frameTracks, result, rect, settings.palmMenu);
       handRuntime.frames.tick(now);
       handRuntime.latency.tick(now, now - (f.captureTime ?? f.timestamp));
     }

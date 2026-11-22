@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { HandKey, UV } from './support/g3d';
 
-/** Opening and using the radial menu with a hand, through the real pipeline. */
+/** Opening and using the radial menu by pointing, through the real pipeline. */
 
 async function open(page: Page) {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -27,7 +27,7 @@ const menu = (page: Page) => page.getByRole('menu', { name: 'Radial menu' });
 // Empty space below the default objects, so the hand isn't hovering anything.
 const SPOT: UV = { u: 0.42, v: 0.72 };
 
-test('an open palm held still opens the menu; pointing up and out, then pinching, adds an object', async ({
+test('pointing (index up) held still opens the menu; pointing up and out, then pinching, adds an object', async ({
   page,
 }) => {
   await open(page);
@@ -36,8 +36,8 @@ test('an open palm held still opens the menu; pointing up and out, then pinching
   const keys: HandKey[] = [
     { at: 0, ...SPOT, pinch: 0 },
     { at: 300, ...SPOT, pinch: 0 },
-    { at: 500, ...SPOT, pinch: 0, spread: 45 },
-    { at: 1500, ...SPOT, pinch: 0, spread: 45 },
+    { at: 500, ...SPOT, pinch: 0, point: true },
+    { at: 1500, ...SPOT, pinch: 0, point: true },
     { at: 1800, ...add, pinch: 0 },
     { at: 2100, ...sphere, pinch: 0 },
     { at: 2400, ...sphere, pinch: 0 },
@@ -56,7 +56,7 @@ test('an open palm held still opens the menu; pointing up and out, then pinching
   expect(await page.evaluate(() => window.__G3D__.pointers().some((p) => p.grabbedId))).toBe(false);
 });
 
-test('a relaxed open hand held still never opens the menu', async ({ page }) => {
+test('an open hand held still never opens the menu', async ({ page }) => {
   await open(page);
   let opened = false;
   const watch = setInterval(async () => {
@@ -81,10 +81,10 @@ test('a relaxed open hand held still never opens the menu', async ({ page }) => 
 test('the menu closes when the hand that opened it leaves', async ({ page }) => {
   await open(page);
   const keys: HandKey[] = [
-    { at: 0, ...SPOT, pinch: 0, spread: 45 },
-    { at: 1300, ...SPOT, pinch: 0, spread: 45 },
-    { at: 1301, ...SPOT, pinch: 0, spread: 45, visible: false },
-    { at: 2200, ...SPOT, pinch: 0, spread: 45, visible: false },
+    { at: 0, ...SPOT, pinch: 0, point: true },
+    { at: 1300, ...SPOT, pinch: 0, point: true },
+    { at: 1301, ...SPOT, pinch: 0, point: true, visible: false },
+    { at: 2200, ...SPOT, pinch: 0, point: true, visible: false },
   ];
   const play = page.evaluate((k) => window.__G3D__.playHand(k), keys);
   await expect(menu(page)).toBeVisible({ timeout: 5000 });
@@ -92,7 +92,7 @@ test('the menu closes when the hand that opened it leaves', async ({ page }) => 
   await expect(menu(page)).toBeHidden();
 });
 
-test('with the setting off, an open palm does nothing', async ({ page }) => {
+test('with the setting off, pointing does nothing', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
       'gestur3d.settings',
@@ -103,8 +103,8 @@ test('with the setting off, an open palm does nothing', async ({ page }) => {
   await page.evaluate(
     (k) => window.__G3D__.playHand(k),
     [
-      { at: 0, ...SPOT, pinch: 0, spread: 45 },
-      { at: 1800, ...SPOT, pinch: 0, spread: 45 },
+      { at: 0, ...SPOT, pinch: 0, point: true },
+      { at: 1800, ...SPOT, pinch: 0, point: true },
     ],
   );
   await expect(menu(page)).toBeHidden();
