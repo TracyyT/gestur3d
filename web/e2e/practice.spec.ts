@@ -97,9 +97,25 @@ test('Practice leaves the workspace scene as it was', async ({ page }) => {
 
   await nav.getByRole('link', { name: 'Workspace' }).click();
   await expect(page).toHaveURL(/\/workspace$/);
+  const debug = () =>
+    page.evaluate(() =>
+      JSON.stringify({
+        kinds: window.__G3D__.objects().map((o) => o.kind),
+        marks: window.__G3D__
+          .session()
+          .filter((e) => e.type === 'mark')
+          .map((e) => `${e.t}:${e.name}:${e.detail ?? ''}`),
+        mode: document.querySelector('[data-mode]')?.getAttribute('data-mode'),
+      }),
+    );
   await expect
-    .poll(() => page.evaluate(() => window.__G3D__.objects().map((o) => o.kind)))
-    .toEqual(['sphere', 'cube', 'sculpture', 'ring']);
+    .poll(() => page.evaluate(() => window.__G3D__.objects().map((o) => o.kind)), {
+      message: 'workspace scene restored',
+    })
+    .toEqual(['sphere', 'cube', 'sculpture', 'ring'])
+    .catch(async (e: unknown) => {
+      throw new Error(`${String(e)}\nDEBUG ${await debug()}`);
+    });
 });
 
 test('the camera prompt in a lesson returns to Practice after setup', async ({ page }) => {
