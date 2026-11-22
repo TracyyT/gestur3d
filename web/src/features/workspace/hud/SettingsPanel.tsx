@@ -43,6 +43,12 @@ export function SettingsPanel() {
             hint="How much of the camera view your hand moves across to cover the scene. Lower = less arm movement."
           />
           <Toggle
+            label="Two-hand depth"
+            hint="Holding with both hands, move them toward or away from the camera to move the object in depth."
+            checked={s.twoHandDepth}
+            onChange={(v) => s.set('twoHandDepth', v)}
+          />
+          <Toggle
             label="Open-palm menu"
             hint="Hold an open hand, fingers spread, toward the camera to open the menu."
             checked={s.palmMenu}

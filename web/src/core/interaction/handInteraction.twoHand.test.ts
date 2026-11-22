@@ -142,6 +142,24 @@ describe('two-hand grabs', () => {
     expect(world.poses.get('a')!.scale).toBeLessThan(2);
   });
 
+  it.each([
+    [true, 'moves it toward the camera'],
+    [false, 'does nothing to depth'],
+  ])('two-hand depth %s: both palms growing %s', (on) => {
+    const { world, engine, step } = rig();
+    engine.configure({ twoHandDepth: on });
+    const at = (id: number, x: number, p: PinchState, palm: number) =>
+      hand(id, x, 200, p, { palm });
+    step(at(1, 190, OPEN, 0.1), at(2, 600, OPEN, 0.1));
+    step(at(1, 190, START, 0.1), at(2, 600, OPEN, 0.1));
+    step(at(1, 190, HOLD, 0.1), at(2, 600, START, 0.1));
+    const z0 = world.pos()[2];
+    for (let i = 0; i < 60; i++) step(at(1, 190, HOLD, 0.13), at(2, 600, HOLD, 0.13));
+    const dz = world.pos()[2] - z0;
+    if (on) expect(dz).toBeGreaterThan(1.2);
+    else expect(dz).toBe(0);
+  });
+
   it('a second hand on a different object grabs that one on its own', () => {
     const { world, step } = rig({ a: [2, 2, 0], b: [5, 2, 0] });
     step(hand(1, 200, 200, OPEN), hand(2, 500, 200, OPEN));

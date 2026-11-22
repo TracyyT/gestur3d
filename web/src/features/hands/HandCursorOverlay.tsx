@@ -187,7 +187,11 @@ export function HandCursorOverlay() {
       const mx = (a.screen.x + b.screen.x) / 2;
       const my = (a.screen.y + b.screen.y) / 2;
       const deg = Math.round((Math.abs(t.roll) * 180) / Math.PI);
-      const text = `${t.scale.toFixed(2)}× · ${deg}°`;
+      const depth =
+        Math.abs(t.depth) >= 0.05
+          ? ` · ${Math.abs(t.depth).toFixed(1)} ${t.depth > 0 ? 'closer' : 'farther'}`
+          : '';
+      const text = `${t.scale.toFixed(2)}× · ${deg}°${depth}`;
       if (text !== chipText) {
         chip.textContent = text;
         chipText = text;

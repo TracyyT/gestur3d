@@ -234,6 +234,53 @@ describe('BimanualGrip', () => {
     expect(r.scale).toBe(1);
   });
 
+  describe('depth', () => {
+    const opts = {
+      ...EXACT,
+      depthGain: 8,
+      depthDeadZone: 0.06,
+      depthFilter: { minCutoff: 1e9, beta: 0, dCutoff: 1 },
+    };
+
+    it('is off by default: bigger palms do nothing', () => {
+      const g = new BimanualGrip(START, L, R, VIEW, 0, EXACT, undefined, [0.1, 0.1]);
+      const r = g.update(L, R, 33, undefined, [0.15, 0.15]);
+      closeVec(r.position, START.position);
+      expect(r.depth).toBe(0);
+    });
+
+    it('a push (palms and spread both 25% bigger) moves it closer without growing it', () => {
+      const g = new BimanualGrip(START, L, R, VIEW, 0, opts, undefined, [0.1, 0.1]);
+      const r = g.update([-1.25, 0, 0], [1.25, 0, 0], 33, undefined, [0.125, 0.125]);
+      const want = 8 * (Math.log(1.25) - 0.06);
+      expect(r.depth).toBeCloseTo(want);
+      closeVec(r.position, [0, 0.25, want]);
+      // The dead-zoned part of the palm change stays in the spread: within 6%.
+      expect(r.scale).toBeGreaterThan(1);
+      expect(r.scale).toBeLessThan(1.07);
+    });
+
+    it('spreading the hands at the same distance only scales', () => {
+      const g = new BimanualGrip(START, L, R, VIEW, 0, opts, undefined, [0.1, 0.1]);
+      const r = g.update([-2, 0, 0], [2, 0, 0], 33, undefined, [0.1, 0.1]);
+      expect(r.scale).toBeCloseTo(2);
+      expect(r.depth).toBe(0);
+    });
+
+    it('pulling both hands back sends it away', () => {
+      const g = new BimanualGrip(START, L, R, VIEW, 0, opts, undefined, [0.1, 0.1]);
+      const r = g.update([-0.8, 0, 0], [0.8, 0, 0], 33, undefined, [0.08, 0.08]);
+      expect(r.depth).toBeCloseTo(8 * (Math.log(0.8) + 0.06));
+    });
+
+    it('palm noise inside the dead zone changes neither depth nor scale', () => {
+      const g = new BimanualGrip(START, L, R, VIEW, 0, opts, undefined, [0.1, 0.1]);
+      const r = g.update(L, R, 33, undefined, [0.105, 0.097]);
+      expect(r.depth).toBe(0);
+      expect(r.scale).toBe(1);
+    });
+  });
+
   it('rebase keeps the current pose', () => {
     const g = new BimanualGrip(START, L, R, VIEW, 0, EXACT);
     const moved = g.update(...hands([0.5, 0.5, 0], 1.5, 0.7), 33);
@@ -279,23 +326,36 @@ describe('BimanualGrip properties', () => {
   it('stays finite and inside the scale limits for any hand path, and rebase never jumps', () => {
     fc.assert(
       fc.property(
-        fc.array(fc.tuple(point, point, fc.boolean()), { minLength: 1, maxLength: 60 }),
+        fc.array(
+          fc.tuple(point, point, fc.boolean(), fc.double({ min: 0.05, max: 0.3, noNaN: true })),
+          { minLength: 1, maxLength: 60 },
+        ),
         (steps) => {
-          const g = new BimanualGrip(START, L, R, VIEW, 0);
+          const g = new BimanualGrip(
+            START,
+            L,
+            R,
+            VIEW,
+            0,
+            { depthGain: 8 },
+            undefined,
+            [0.12, 0.12],
+          );
           let t = 0;
-          for (const [a, b, rebase] of steps) {
+          for (const [a, b, rebase, palm] of steps) {
+            const palms = [palm, palm * 1.1] as const;
             t += 33;
             if (rebase) {
               const before = g.result;
-              g.rebase(before, a, b, t);
+              g.rebase(before, a, b, t, undefined, palms);
               t += 33;
-              const after = g.update(a, b, t);
+              const after = g.update(a, b, t, undefined, palms);
               for (let i = 0; i < 3; i++)
                 expect(Math.abs(after.position[i]! - before.position[i]!)).toBeLessThan(1e-6);
               expect(Math.abs(after.scale - before.scale)).toBeLessThan(1e-9);
               expect(quatAngleBetween(after.rotation, before.rotation)).toBeLessThan(1e-6);
             }
-            const r = g.update(a, b, t);
+            const r = g.update(a, b, t, undefined, palms);
             expect(r.position.every(Number.isFinite)).toBe(true);
             expect(r.rotation.every(Number.isFinite)).toBe(true);
             expect(r.scale).toBeGreaterThanOrEqual(DEFAULT_BIMANUAL_OPTIONS.scaleMin - 1e-9);
