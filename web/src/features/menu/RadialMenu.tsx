@@ -71,7 +71,7 @@ function ActionIcon({ action }: { action: MenuAction }) {
     clear: <path d="M3 13h10M5 10l5-6 2.5 2.5-5 6" {...p} />,
   };
   return (
-    <svg viewBox="0 0 16 16" className="size-4" aria-hidden>
+    <svg viewBox="0 0 16 16" className="size-5" aria-hidden>
       {paths[action]}
     </svg>
   );
@@ -148,9 +148,9 @@ export function RadialMenu() {
                     stroke={on && enabled ? palette.cyan : 'rgb(255 255 255 / 0.1)'}
                     strokeWidth={on ? 1.5 : 1}
                   />
-                  <foreignObject x={lx - 30} y={ly - 22} width={60} height={44}>
+                  <foreignObject x={lx - 38} y={ly - 27} width={76} height={54}>
                     <div
-                      className={`flex h-full flex-col items-center justify-center gap-1 text-[11px] ${
+                      className={`flex h-full flex-col items-center justify-center gap-1 text-[12.5px] ${
                         enabled ? (on ? 'text-ink-1' : 'text-ink-2') : 'text-ink-4'
                       }`}
                     >
@@ -181,9 +181,9 @@ export function RadialMenu() {
                       stroke={on ? palette.violet : 'rgb(255 255 255 / 0.1)'}
                       strokeWidth={on ? 1.5 : 1}
                     />
-                    <foreignObject x={lx - 32} y={ly - 20} width={64} height={40}>
+                    <foreignObject x={lx - 38} y={ly - 24} width={76} height={48}>
                       <div
-                        className={`flex h-full flex-col items-center justify-center gap-0.5 text-[10.5px] ${
+                        className={`flex h-full flex-col items-center justify-center gap-1 text-[11.5px] ${
                           on ? 'text-ink-1' : 'text-ink-2'
                         }`}
                       >
@@ -213,7 +213,7 @@ export function RadialMenu() {
               x={C}
               y={C + 4}
               textAnchor="middle"
-              className="fill-ink-1 font-sans text-[12px] font-medium"
+              className="fill-ink-1 font-sans text-[13px] font-medium"
             >
               {center}
             </text>
