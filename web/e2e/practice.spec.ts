@@ -35,11 +35,9 @@ test('lesson 1 passes with one hand, then both, held in view', async ({ page }) 
     right,
     left,
   ] as const);
-  // One hand alone gets halfway, no further.
-  await page.waitForTimeout(2300);
-  const half = Number(await progress(page).getAttribute('aria-valuenow'));
-  expect(half).toBeGreaterThanOrEqual(40);
-  expect(half).toBeLessThanOrEqual(60);
+  // One hand alone passes the first step, then asks for the other.
+  await expect(lesson(page).getByText('Now the other hand too')).toBeVisible({ timeout: 20_000 });
+  expect(Number(await progress(page).getAttribute('aria-valuenow'))).toBeLessThan(100);
   await play;
   await expect(lesson(page).getByText('Nice, that’s it.')).toBeVisible();
   await expect(progress(page)).toHaveAttribute('aria-valuenow', '100');

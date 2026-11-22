@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { createInitialScene } from '@/core/interaction/sceneModel';
 import { LESSONS, type Lesson } from '@/core/practice/lessons';
+import { borrowScene } from '@/features/modes/borrowScene';
 import { ModeShell } from '@/features/modes/ModeShell';
 import { sessionLog } from '@/features/session/session';
 import { useScene } from '@/stores/scene';
@@ -9,14 +10,6 @@ import { Button, GlassPanel, buttonClasses } from '@/ui';
 import { LessonCard } from './LessonCard';
 import { practiceDone, usePractice } from './practiceStore';
 import { useLessonRunner } from './useLessonRunner';
-
-/** Keeps the workspace's scene aside while Practice uses its own, and puts it back after. */
-function useBorrowedScene() {
-  useEffect(() => {
-    const { objects, selectedId, nextId, undoStack } = useScene.getState();
-    return () => useScene.setState({ objects, selectedId, nextId, undoStack, mode: 'idle' });
-  }, []);
-}
 
 function FreePractice({ onRestart }: { onRestart: () => void }) {
   const done = practiceDone(usePractice((s) => s.completed));
@@ -53,7 +46,8 @@ function FreePractice({ onRestart }: { onRestart: () => void }) {
 
 /** Practice mode: short lessons with live feedback, then free practice. */
 export function PracticePage() {
-  useBorrowedScene();
+  // Practice uses its own scene; the workspace's comes back on leaving.
+  useEffect(borrowScene, []);
   const { current, completed, goTo, complete, skip } = usePractice();
   const [attempt, setAttempt] = useState(0);
   const free = current >= LESSONS.length;
