@@ -12,8 +12,14 @@ export interface ModeInfo {
 }
 
 export const MODES: readonly ModeInfo[] = [
+  { id: 'practice', label: 'Practice', path: '/practice' },
   { id: 'workspace', label: 'Workspace', path: '/workspace' },
 ];
+
+/** A mode path to return to after camera setup, if `next` names one. */
+export function modeReturnPath(next: string | null): string {
+  return MODES.find((m) => m.path === next)?.path ?? '/workspace';
+}
 
 /** Routes where the camera may stay on: setup and every mode. */
 export function isCameraRoute(pathname: string): boolean {

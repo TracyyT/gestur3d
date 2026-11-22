@@ -17,7 +17,16 @@ const points = [
   },
 ];
 
-export function PermissionIntro({ onEnable, busy }: { onEnable: () => void; busy: boolean }) {
+export function PermissionIntro({
+  onEnable,
+  busy,
+  continueTo = '/workspace',
+}: {
+  onEnable: () => void;
+  busy: boolean;
+  /** Where "Continue with mouse only" goes. */
+  continueTo?: string;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -68,7 +77,7 @@ export function PermissionIntro({ onEnable, busy }: { onEnable: () => void; busy
           <Button variant="primary" size="lg" onClick={onEnable} disabled={busy}>
             {busy ? 'Waiting for permission…' : 'Turn on camera'}
           </Button>
-          <Link to="/workspace" className={buttonClasses('ghost', 'lg')}>
+          <Link to={continueTo} className={buttonClasses('ghost', 'lg')}>
             Continue with mouse only
           </Link>
         </div>

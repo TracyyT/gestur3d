@@ -9,7 +9,8 @@ import { RadialMenu } from '@/features/menu/RadialMenu';
 import { installTestHooks } from '@/features/hands/testHooks';
 import { useLiveHandSource } from '@/features/hands/useLiveHandSource';
 import { recordSession } from '@/features/session/session';
-import { Hud } from '@/features/workspace/hud/Hud';
+import { Hud, type HudOptions } from '@/features/workspace/hud/Hud';
+import { ModeSwitcher } from './ModeSwitcher';
 import type { ModeId } from './modes';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { useSceneKeyboard } from './useSceneKeyboard';
@@ -74,6 +75,8 @@ export interface ModeShellProps {
   hint?: (openHelp: () => void) => ReactNode;
   /** Mode-specific overlays (lesson card, level bar), above the HUD. */
   children?: ReactNode;
+  /** Which HUD parts to show. */
+  hud?: HudOptions;
 }
 
 /**
@@ -81,7 +84,7 @@ export interface ModeShellProps {
  * keyboard), live hand tracking, cursors, the radial menu, the HUD, the
  * header and the controls sheet. Modes add scene content and overlays.
  */
-export function ModeShell({ mode, sceneLabel, scene, hint, children }: ModeShellProps) {
+export function ModeShell({ mode, sceneLabel, scene, hint, children, hud }: ModeShellProps) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [webgl] = useState(supportsWebGL2);
   const toggleHelp = useCallback(() => setHelpOpen((o) => !o), []);
@@ -113,10 +116,10 @@ export function ModeShell({ mode, sceneLabel, scene, hint, children }: ModeShell
       <RadialMenu />
       <HandCursorOverlay />
       <SelectionAnnouncer />
-      <Hud />
+      <Hud {...hud} />
       {children}
 
-      <header className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-4">
+      <header className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-2 p-4">
         <Link
           to="/"
           className="glass pointer-events-auto flex items-center gap-2 rounded-full py-1.5 pr-4 pl-2 text-[13px] font-medium"
@@ -124,6 +127,7 @@ export function ModeShell({ mode, sceneLabel, scene, hint, children }: ModeShell
           <Logo className="size-5" />
           Gestur3D
         </Link>
+        <ModeSwitcher current={mode} />
       </header>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center px-4">

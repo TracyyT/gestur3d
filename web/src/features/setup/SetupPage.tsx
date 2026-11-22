@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { MODES, modeReturnPath } from '@/features/modes/modes';
 import { useCameraSession } from '@/features/camera/cameraSession';
 import { HandOverlay } from '@/features/camera/HandOverlay';
 import { useFrameLuminance } from '@/features/camera/useFrameLuminance';
@@ -51,7 +52,11 @@ export function SetupPage() {
     const v = videoRef.current;
     return v?.videoWidth && v.videoHeight ? v.videoWidth / v.videoHeight : 16 / 9;
   }, []);
-  const enterWorkspace = useCallback(() => navigate('/workspace'), [navigate]);
+  // Where to go afterwards: the mode that sent you here (?next=/practice), else the workspace.
+  const [params] = useSearchParams();
+  const dest = modeReturnPath(params.get('next'));
+  const destLabel = MODES.find((m) => m.path === dest)!.label.toLowerCase();
+  const enterWorkspace = useCallback(() => navigate(dest), [navigate, dest]);
   const thumbsProgress = useThumbsUpHold(
     tracking.latest,
     getAspect,
@@ -96,11 +101,20 @@ export function SetupPage() {
 
       <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 items-center px-6 pb-12 md:px-10">
         {(status === 'off' || status === 'starting') && (
-          <PermissionIntro onEnable={() => void start()} busy={status === 'starting'} />
+          <PermissionIntro
+            onEnable={() => void start()}
+            busy={status === 'starting'}
+            continueTo={dest}
+          />
         )}
 
         {status === 'error' && error && (
-          <CameraErrorView kind={error.kind} detail={error.message} onRetry={() => void start()} />
+          <CameraErrorView
+            kind={error.kind}
+            detail={error.message}
+            onRetry={() => void start()}
+            continueTo={dest}
+          />
         )}
 
         {live && (
@@ -191,10 +205,10 @@ export function SetupPage() {
                   size="lg"
                   onClick={enterWorkspace}
                 >
-                  {allGood ? 'Enter workspace' : 'Enter anyway'}
+                  {allGood ? `Enter ${destLabel}` : 'Enter anyway'}
                 </Button>
                 <Link
-                  to="/workspace"
+                  to={dest}
                   onClick={stop}
                   className={buttonClasses('ghost', 'sm', 'self-center')}
                 >

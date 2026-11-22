@@ -96,7 +96,9 @@ function held(
       const done = p >= 1;
       // Before the hold starts, show how close the condition is (if known).
       const progress = done ? 1 : r.ok ? 0.5 + p / 2 : (r.partial ?? 0) / 2;
-      return { progress, done, ...(done ? {} : r.hint ? { hint: r.hint } : {}) };
+      // While the condition holds, the hint is about holding, not the original ask.
+      const hint = r.ok ? 'Hold it there…' : r.hint;
+      return { progress, done, ...(done || !hint ? {} : { hint }) };
     },
     reset: () => timer.reset(),
   };

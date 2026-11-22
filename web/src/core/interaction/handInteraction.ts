@@ -51,6 +51,8 @@ export interface HandPointer {
   pinchStrength: number;
   /** Smoothed thumb-index / palm ratio, for calibration readouts. */
   pinchRatio: number;
+  /** Inside the reach box (cursor on the scene). */
+  inBox: boolean;
   hoverId: string | null;
   grabbedId: string | null;
   /** When this pointer last released an object (for the release ripple). */
@@ -726,6 +728,7 @@ export class HandInteractionEngine {
       tip: input.tip,
       pinchStrength: input.pinch.strength,
       pinchRatio: input.pinch.ratio,
+      inBox: input.inBox,
       hoverId,
       grabbedId: m.grab?.objectId ?? null,
       releasedAt: m.releasedAt,
