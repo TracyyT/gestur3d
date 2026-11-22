@@ -5,11 +5,11 @@ import { useSettings } from '@/stores/settings';
 import { useHandTracking } from './handTrackingStore';
 
 /**
- * Starts live hand detection in the workspace whenever the camera is on.
+ * Starts live hand detection in a mode whenever the camera is on.
  * Uses its own hidden <video> so detection doesn't depend on the preview
  * being visible. A replay installed by test hooks takes precedence.
  */
-export function useWorkspaceHandSource() {
+export function useLiveHandSource() {
   const stream = useCameraSession((s) => s.stream);
   const preference = useSettings((s) => s.trackingBackend);
 

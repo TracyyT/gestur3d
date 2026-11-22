@@ -12,7 +12,7 @@ import { useSettings } from '@/stores/settings';
  * Tab / Shift+Tab cycle objects, but stepping past either end lets focus
  * leave the scene normally, so there's no keyboard trap.
  */
-export function useWorkspaceKeyboard(onToggleHelp: () => void) {
+export function useSceneKeyboard(onToggleHelp: () => void) {
   return useCallback(
     (e: KeyboardEvent<HTMLElement>) => {
       if (e.target !== e.currentTarget) return; // only when the scene itself has focus
