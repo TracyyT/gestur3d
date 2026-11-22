@@ -85,12 +85,12 @@ export const useMenu = create<MenuState>()((set, get) => ({
   openAt: (x, y, by) => set({ open: true, x, y, openedBy: by, expanded: null, highlight: NONE }),
   close: () => set({ open: false, openedBy: null, expanded: null, highlight: NONE }),
   point: (dx, dy) => {
-    const { expanded } = get();
+    const { expanded, highlight } = get();
     const outer =
       expanded !== null
         ? { parent: expanded, count: outerItems(MENU_ACTIONS[expanded]!)!.length }
         : null;
-    const hit = hitTest(dx, dy, outer);
+    const hit = hitTest(dx, dy, outer, highlight);
     let next = expanded;
     if (hit.ring === 'inner') {
       const action = MENU_ACTIONS[hit.index]!;

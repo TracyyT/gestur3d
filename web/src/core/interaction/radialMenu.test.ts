@@ -47,4 +47,41 @@ describe('radial menu hit testing', () => {
     expect(hitTest(...at(120 - 36, 150), colors)).toEqual({ ring: 'outer', index: 0 });
     expect(hitTest(...at(300, 150), colors)).toEqual({ ring: 'inner', index: 5 });
   });
+
+  describe('sticky highlight', () => {
+    const add = { ring: 'inner', index: 0 } as const;
+
+    it('a small drift past the edge keeps the current sector', () => {
+      // Sector edges are at ±30°; the highlight holds to ±43.5°.
+      expect(hitTest(...at(35, 80), null, add)).toEqual(add);
+      expect(hitTest(...at(-40, 80), null, add)).toEqual(add);
+    });
+
+    it('moving clearly into a neighbor switches', () => {
+      expect(hitTest(...at(46, 80), null, add)).toEqual({ ring: 'inner', index: 1 });
+      expect(hitTest(...at(-46, 80), null, add)).toEqual({ ring: 'inner', index: 5 });
+    });
+
+    it('without a current highlight, the plain edges apply', () => {
+      expect(hitTest(...at(35, 80), null)).toEqual({ ring: 'inner', index: 1 });
+    });
+
+    it('outer items stick too, and dipping just inside the inner ring keeps them', () => {
+      const nine = { parent: 0, count: 9 };
+      const item0 = { ring: 'outer', index: 0 } as const;
+      // Outer items are 40° wide: edges at ±20°, sticky to ±29°.
+      expect(hitTest(...at(25, MENU_GEOMETRY.innerOuter + 20), nine, item0)).toEqual(item0);
+      expect(hitTest(...at(0, MENU_GEOMETRY.innerOuter - 8), nine, item0)).toEqual(item0);
+      expect(hitTest(...at(32, MENU_GEOMETRY.innerOuter + 20), nine, item0)).toEqual({
+        ring: 'outer',
+        index: 1,
+      });
+    });
+
+    it('the center needs a deeper return to cancel once something is highlighted', () => {
+      const r = MENU_GEOMETRY.deadZone * 0.85;
+      expect(hitTest(...at(0, r), null)).toEqual({ ring: 'none' });
+      expect(hitTest(...at(0, r), null, add)).toEqual(add);
+    });
+  });
 });

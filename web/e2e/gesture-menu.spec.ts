@@ -109,3 +109,23 @@ test('with the setting off, pointing does nothing', async ({ page }) => {
   );
   await expect(menu(page)).toBeHidden();
 });
+
+test('a small drift toward a neighbor keeps the highlighted choice', async ({ page }) => {
+  await open(page);
+  const r = await page.evaluate(() => window.__G3D__.sceneRect());
+  const add = await above(page, SPOT, 75); // straight up: Add
+  // About 35° clockwise from up: past the Add/Draw edge (30°), not past the sticky margin.
+  const drift: UV = { u: SPOT.u + 52 / r.width, v: SPOT.v - 75 / r.height };
+  const keys: HandKey[] = [
+    { at: 0, ...SPOT, pinch: 0, point: true },
+    { at: 1300, ...SPOT, pinch: 0, point: true },
+    { at: 1600, ...add, pinch: 0 },
+    { at: 1900, ...add, pinch: 0 },
+    { at: 2200, ...drift, pinch: 0 },
+    { at: 2600, ...drift, pinch: 0 },
+  ];
+  const play = page.evaluate((k) => window.__G3D__.playHand(k), keys);
+  await expect(menu(page)).toBeVisible({ timeout: 5000 });
+  await play;
+  await expect(menu(page).locator('svg > text')).toHaveText('Add');
+});
