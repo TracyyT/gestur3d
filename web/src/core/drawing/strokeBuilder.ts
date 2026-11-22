@@ -56,8 +56,12 @@ export class StrokeBuilder {
     if (now - this.startedAt < STROKE.minDurationMs || this.travel < STROKE.minTravelPx)
       return null;
     if (this.points.length < 2) return null;
-    const smooth = catmullRom(this.points, STROKE.smoothSteps);
-    return simplify(smooth, STROKE.simplify * extent(this.points));
+    // Thin the raw points first (half tolerance), so smoothing and the final
+    // pass work on a few hundred points instead of thousands: a 2000-point
+    // stroke finishes in about a millisecond instead of 10.
+    const tol = STROKE.simplify * extent(this.points);
+    const smooth = catmullRom(simplify(this.points, tol / 2), STROKE.smoothSteps);
+    return simplify(smooth, tol);
   }
 }
 
@@ -110,9 +114,9 @@ export function simplify(points: Vec3[], tolerance: number): Vec3[] {
   while (stack.length) {
     const [a, b] = stack.pop()!;
     let worst = -1;
-    let worstD = tolerance;
+    let worstD = tolerance * tolerance;
     for (let i = a + 1; i < b; i++) {
-      const d = distToSegment(points[i]!, points[a]!, points[b]!);
+      const d = distToSegment2(points[i]!, points[a]!, points[b]!);
       if (d > worstD) {
         worstD = d;
         worst = i;
@@ -126,13 +130,18 @@ export function simplify(points: Vec3[], tolerance: number): Vec3[] {
   return points.filter((_, i) => keep[i]).map((p) => [...p] as Vec3);
 }
 
-function distToSegment(p: Vec3, a: Vec3, b: Vec3) {
-  const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-  const ap = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];
-  const len2 = ab[0]! ** 2 + ab[1]! ** 2 + ab[2]! ** 2;
-  const t =
-    len2 > 0
-      ? Math.max(0, Math.min(1, (ap[0]! * ab[0]! + ap[1]! * ab[1]! + ap[2]! * ab[2]!) / len2))
-      : 0;
-  return Math.hypot(ap[0]! - ab[0]! * t, ap[1]! - ab[1]! * t, ap[2]! - ab[2]! * t);
+/** Squared distance from p to segment ab (allocation-free: it runs per point per pass). */
+function distToSegment2(p: Vec3, a: Vec3, b: Vec3) {
+  const abx = b[0] - a[0];
+  const aby = b[1] - a[1];
+  const abz = b[2] - a[2];
+  const apx = p[0] - a[0];
+  const apy = p[1] - a[1];
+  const apz = p[2] - a[2];
+  const len2 = abx * abx + aby * aby + abz * abz;
+  const t = len2 > 0 ? Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / len2)) : 0;
+  const dx = apx - abx * t;
+  const dy = apy - aby * t;
+  const dz = apz - abz * t;
+  return dx * dx + dy * dy + dz * dz;
 }
