@@ -5,6 +5,7 @@ import { LandmarkRecorder } from '@/core/vision/replaySource';
 import { handRuntime } from '@/features/hands/handRuntime';
 import { useHandTracking } from '@/features/hands/handTrackingStore';
 import { useSampled } from '@/hooks/useSampled';
+import { renderStats } from '@/lib/telemetry/renderStats';
 import { sensitivityToThresholds } from '@/core/tracking/pinch';
 import { useSettings, type TrackingBackendPreference } from '@/stores/settings';
 import { Button, Panel, Select, buttonClasses } from '@/ui';
@@ -45,6 +46,7 @@ export function TrackingPanel() {
       fps: stats?.rate(now) ?? handRuntime.frames.rate(now),
       inferMs: stats?.meanDuration() ?? 0,
       latencyMs: handRuntime.latency.meanDuration(),
+      ...(({ drawCalls, triangles }) => ({ drawCalls, triangles }))(renderStats.snapshot(now)),
       hands: handRuntime.pointers.filter((p) => p.phase !== 'lost').length,
       frames: recorder.current.frameCount,
       ratios: handRuntime.pointers
@@ -104,6 +106,16 @@ export function TrackingPanel() {
             <Metric label="Hands" value={String(m.hands)} />
           </div>
         )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <Metric label="Draw calls" value={m.drawCalls ? String(m.drawCalls) : '—'} />
+          <Metric
+            label="Triangles"
+            value={
+              m.triangles ? `${(m.triangles / 1000).toFixed(m.triangles < 10_000 ? 1 : 0)}k` : '—'
+            }
+          />
+        </div>
 
         {running && (
           <div className="glass-inset rounded-lg px-2.5 py-2 text-[12px]">
