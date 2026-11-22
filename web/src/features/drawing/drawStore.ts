@@ -25,8 +25,9 @@ export const useDraw = create<DrawState>()((set) => ({
 export const drawRuntime = {
   live: new Map<number, Vec3[]>(),
   version: 0,
-  reset() {
-    this.live.clear();
+  /** Drop the hands' live strokes (the mouse's, keyed -1, stays). */
+  resetHands() {
+    for (const id of [...this.live.keys()]) if (id >= 0) this.live.delete(id);
     this.version++;
   },
 };
