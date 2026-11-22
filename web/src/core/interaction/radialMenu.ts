@@ -60,28 +60,69 @@ export type MenuHit =
  * sector. Beyond the inner ring, with no outer ring open, the inner sector in
  * that direction stays highlighted, so a hand that overshoots still works.
  */
+/**
+ * How far past a sector's edge the pointer must go before the highlight moves
+ * on, as a fraction of the sector's half-width, and how far inside the center
+ * circle it must come back before nothing is highlighted. Hands drift a little;
+ * this keeps small drifts from hopping to a neighbor.
+ */
+export const STICKY = {
+  sector: 0.45,
+  ring: 12,
+  deadZone: 0.75,
+} as const;
+
+/** Unsigned angle between two directions, in [0, π]. */
+const angleGap = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+
+/**
+ * What a pointer at offset (dx, dy) from the menu center points at. `outer`
+ * is the open outer ring (its item count and parent sector), if any. Beyond
+ * the inner ring with no outer ring open, the inner sector in that direction
+ * stays highlighted, so a hand that overshoots still works.
+ *
+ * With `prev` (the current highlight), the result is sticky (see `STICKY`): a
+ * highlighted item keeps the highlight until the pointer is clearly inside
+ * another one.
+ */
 export function hitTest(
   dx: number,
   dy: number,
   outer: { parent: number; count: number } | null,
+  prev: MenuHit = { ring: 'none' },
 ): MenuHit {
   const r = Math.hypot(dx, dy);
-  if (r < MENU_GEOMETRY.deadZone) return { ring: 'none' };
-  const a = screenAngle(dx, dy);
-  if (r >= MENU_GEOMETRY.innerOuter && outer && outer.count > 0) {
-    const step = outerStep(outer.count);
-    for (let j = 0; j < outer.count; j++) {
-      const d = Math.abs(
-        Math.atan2(
-          Math.sin(a - outerAngle(outer.parent, j, outer.count)),
-          Math.cos(a - outerAngle(outer.parent, j, outer.count)),
-        ),
-      );
-      if (d <= step / 2) return { ring: 'outer', index: j };
-    }
-    // Outside the fan of a short outer ring: fall back to the inner sector.
+  const G = MENU_GEOMETRY;
+  // Leaving the center takes the full dead zone; coming back takes more.
+  if (r < (prev.ring === 'none' ? G.deadZone : G.deadZone * STICKY.deadZone)) {
+    return { ring: 'none' };
   }
+  const a = screenAngle(dx, dy);
   const n = MENU_ACTIONS.length;
-  const index = Math.round(a / ((2 * Math.PI) / n)) % n;
-  return { ring: 'inner', index };
+  const half = Math.PI / n;
+
+  if (outer && outer.count > 0) {
+    const step = outerStep(outer.count);
+    const centerOf = (j: number) => outerAngle(outer.parent, j, outer.count);
+    // Stay on the outer item while still near it (in angle and radius).
+    if (
+      prev.ring === 'outer' &&
+      r >= G.innerOuter - STICKY.ring &&
+      angleGap(a, centerOf(prev.index)) <= (step / 2) * (1 + STICKY.sector)
+    ) {
+      return prev;
+    }
+    const outward = prev.ring === 'outer' ? G.innerOuter - STICKY.ring : G.innerOuter;
+    if (r >= outward) {
+      for (let j = 0; j < outer.count; j++) {
+        if (angleGap(a, centerOf(j)) <= step / 2) return { ring: 'outer', index: j };
+      }
+      // Outside the fan of a short outer ring: fall back to the inner sector.
+    }
+  }
+
+  if (prev.ring === 'inner' && angleGap(a, sectorAngle(prev.index)) <= half * (1 + STICKY.sector)) {
+    return prev;
+  }
+  return { ring: 'inner', index: Math.round(a / (2 * half)) % n };
 }
