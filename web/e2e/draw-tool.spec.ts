@@ -62,3 +62,46 @@ test('with Draw on, pinching an object still grabs it instead of drawing', async
   expect(Math.abs(end.u - to.u)).toBeLessThan(0.01);
   expect(await count(page)).toBe(before);
 });
+
+test('the radial menu turns Draw on, clears drawings, and Undo brings them back', async ({
+  page,
+}) => {
+  await open(page);
+  const scene = page.getByRole('application');
+  const menu = page.getByRole('menu', { name: 'Radial menu' });
+  const drawButton = page.getByRole('button', { name: 'Draw' });
+  const strokes = () =>
+    page.evaluate(() => window.__G3D__.objects().filter((o) => o.kind === 'stroke').length);
+
+  await scene.focus();
+  await page.keyboard.press('m');
+  await expect(menu.getByRole('menuitem', { name: 'Clear' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  for (let i = 0; i < 2; i++) await page.keyboard.press('ArrowRight'); // Draw
+  await page.keyboard.press('Enter');
+  await expect(drawButton).toHaveAttribute('aria-pressed', 'true');
+
+  await page.keyboard.press('m');
+  await expect(menu.getByRole('menuitem', { name: 'Draw off' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await page.evaluate(() => {
+    const line = (y: number) =>
+      Array.from({ length: 8 }, (_, i) => [-1 + i * 0.3, y, 0.8] as [number, number, number]);
+    window.__G3D__.addStroke(line(1.2));
+    window.__G3D__.addStroke(line(0.6));
+  });
+  expect(await strokes()).toBe(2);
+
+  await page.keyboard.press('m');
+  for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowRight'); // Clear
+  await page.keyboard.press('Enter');
+  await expect.poll(strokes).toBe(0);
+
+  await page.keyboard.press('m');
+  for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight'); // Undo
+  await page.keyboard.press('Enter');
+  await expect.poll(strokes).toBe(2);
+});

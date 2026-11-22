@@ -45,6 +45,14 @@ export type Command =
   | { type: 'remove'; id: string }
   /** Put a removed object back where it was (used by Undo). */
   | { type: 'restore'; object: SceneObject; index: number; selected: boolean }
+  /** Remove every drawing. */
+  | { type: 'clearStrokes' }
+  /** Put several removed objects back at their indices (ascending), e.g. undoing Clear. */
+  | {
+      type: 'restoreMany';
+      items: { object: SceneObject; index: number }[];
+      selectedId: string | null;
+    }
   | { type: 'reset' };
 
 export interface SceneObject {

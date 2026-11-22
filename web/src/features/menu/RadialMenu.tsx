@@ -12,6 +12,7 @@ import {
 import { KIND_LABEL } from '@/core/interaction/sceneModel';
 import { KindIcon } from '@/features/workspace/hud/ObjectsPanel';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { useDraw } from '@/features/drawing/drawStore';
 import { useScene } from '@/stores/scene';
 import { palette } from '@/ui/theme';
 import { actionEnabled, outerItems, useMenu } from './menuStore';
@@ -24,6 +25,10 @@ const LABEL: Record<MenuAction, string> = {
   delete: 'Delete',
   clear: 'Clear',
 };
+
+/** The Draw item turns the tool off when it's on. */
+const labelOf = (action: MenuAction, drawing: boolean) =>
+  action === 'draw' && drawing ? 'Draw off' : LABEL[action];
 
 const COLOR_LABEL: Record<HoloColor, string> = { cyan: 'Cyan', violet: 'Violet', white: 'White' };
 const SWATCH: Record<HoloColor, string> = {
@@ -85,7 +90,8 @@ function ActionIcon({ action }: { action: MenuAction }) {
 export function RadialMenu() {
   const { open, x, y, expanded, highlight, point, choose, close } = useMenu();
   // Subscribed so enabled states refresh when the selection or history changes.
-  useScene((s) => `${s.selectedId}|${s.undoStack.length}`);
+  useScene((s) => `${s.selectedId}|${s.undoStack.length}|${s.objects.length}`);
+  const drawing = useDraw((s) => s.active);
   const reduced = useReducedMotion();
 
   const outer = expanded !== null ? outerItems(MENU_ACTIONS[expanded]!) : null;
@@ -93,7 +99,7 @@ export function RadialMenu() {
   const half = Math.PI / n;
 
   let center = 'Close';
-  if (highlight.ring === 'inner') center = LABEL[MENU_ACTIONS[highlight.index]!];
+  if (highlight.ring === 'inner') center = labelOf(MENU_ACTIONS[highlight.index]!, drawing);
   if (highlight.ring === 'outer' && outer && expanded !== null) {
     const item = outer[highlight.index]!;
     center =
@@ -141,7 +147,12 @@ export function RadialMenu() {
               const enabled = actionEnabled(action);
               const [lx, ly] = pt((G.deadZone + G.innerOuter) / 2, a);
               return (
-                <g key={action} role="menuitem" aria-label={LABEL[action]} aria-disabled={!enabled}>
+                <g
+                  key={action}
+                  role="menuitem"
+                  aria-label={labelOf(action, drawing)}
+                  aria-disabled={!enabled}
+                >
                   <path
                     d={wedge(G.deadZone + 4, G.innerOuter, a - half, a + half)}
                     fill={on && enabled ? 'rgb(94 231 255 / 0.16)' : 'rgb(12 15 24 / 0.9)'}
@@ -151,11 +162,17 @@ export function RadialMenu() {
                   <foreignObject x={lx - 38} y={ly - 27} width={76} height={54}>
                     <div
                       className={`flex h-full flex-col items-center justify-center gap-1 text-[12.5px] ${
-                        enabled ? (on ? 'text-ink-1' : 'text-ink-2') : 'text-ink-4'
+                        enabled
+                          ? on
+                            ? 'text-ink-1'
+                            : action === 'draw' && drawing
+                              ? 'text-holo-cyan'
+                              : 'text-ink-2'
+                          : 'text-ink-4'
                       }`}
                     >
                       <ActionIcon action={action} />
-                      {LABEL[action]}
+                      {labelOf(action, drawing)}
                     </div>
                   </foreignObject>
                 </g>
