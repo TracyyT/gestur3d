@@ -30,7 +30,8 @@ export function PreviewDebugOverlay() {
     };
   }, [source]);
 
-  const rect = visibleSceneRect(panels, window.innerWidth, window.innerHeight);
+  const leftInset = useHudLayout((s) => s.leftInset);
+  const rect = visibleSceneRect(panels, window.innerWidth, window.innerHeight, leftInset);
   const box = interactionBox(reach, aspect, rect.width / rect.height);
 
   return (

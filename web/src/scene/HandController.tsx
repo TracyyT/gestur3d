@@ -109,7 +109,8 @@ export function HandController() {
     }
 
     const aspect = useHandTracking.getState().cameraAspect;
-    const rect = visibleSceneRect(useHudLayout.getState().panelsVisible, size.width, size.height);
+    const hud = useHudLayout.getState();
+    const rect = visibleSceneRect(hud.panelsVisible, size.width, size.height, hud.leftInset);
     const box = interactionBox(settings.handReach, aspect, rect.width / rect.height);
 
     const { raycaster, ndc, plane, v, n, right, up, back, bounds, sphere } = tools;

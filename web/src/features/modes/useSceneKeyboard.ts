@@ -47,10 +47,12 @@ export function useSceneKeyboard(onToggleHelp: () => void) {
       }
       if ((e.key === 'm' || e.key === 'M') && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
+        const hud = useHudLayout.getState();
         const r = visibleSceneRect(
-          useHudLayout.getState().panelsVisible,
+          hud.panelsVisible,
           window.innerWidth,
           window.innerHeight,
+          hud.leftInset,
         );
         menu.openAt(r.left + r.width / 2, r.top + r.height / 2, 'keyboard');
         return;

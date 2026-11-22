@@ -158,6 +158,9 @@ export function LandingPage() {
                   />
                 </svg>
               </Link>
+              <Link to="/setup?next=/practice" className={buttonClasses('secondary', 'lg')}>
+                Practice gestures
+              </Link>
               <Link to="/workspace" className={buttonClasses('ghost', 'lg')}>
                 Try with mouse
               </Link>

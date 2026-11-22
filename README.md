@@ -102,7 +102,7 @@ Gestur3D is growing into three modes on one shared gesture and interaction engin
 | M1 Foundation                     | Repo, design system, landing, camera setup, mouse/keyboard workspace, HUD               | ✅ Done |
 | M2 Hand tracking and manipulation | Detection pipeline, smoothing, pinch grab/move/release, landmark recorder               | ✅ Done |
 | M3 Advanced interactions          | Two-hand scale/rotate/depth, air drawing, radial menu, undo, rule baselines             | ✅ Done |
-| M4 Modes and Practice             | Mode shell and navigation, session log, 7 lessons + optional push/pull, free practice   | Next    |
+| M4 Modes and Practice             | Mode shell and navigation, session log, Practice checklist of gestures with live checks | Next    |
 | M5 Dataset collection tool        | Participant IDs, consent, static and dynamic samples, review, export; landmarks only    | Planned |
 | M6 Playground                     | Level-based building puzzles, target previews, snapping, time and accuracy scoring      | Planned |
 | M7 Model training                 | Static MLP and dynamic GRU/TCN, participant-separated splits, ONNX, beat rule baselines | Planned |

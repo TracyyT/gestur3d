@@ -34,4 +34,21 @@ describe('visibleSceneRect', () => {
     expect(visibleSceneRect(false, 1440, 900).width).toBe(1440);
     expect(visibleSceneRect(true, 800, 900).width).toBe(800);
   });
+
+  it('a left panel moves the scene right, into the middle of the space between', () => {
+    const f = computeFraming(true, 1440, 900, 356);
+    const r = visibleSceneRect(true, 1440, 900, 356);
+    expect(r).toEqual({ left: 356, top: 0, width: 1440 - 356 - PANEL_COVER_PX, height: 900 });
+    // The scene's center lands at the free rect's center.
+    expect(1440 / 2 - f.offsetX).toBe(r.left + r.width / 2);
+  });
+
+  it('a left panel overlays narrow windows instead of reframing', () => {
+    expect(visibleSceneRect(false, 800, 900, 356)).toEqual({
+      left: 0,
+      top: 0,
+      width: 800,
+      height: 900,
+    });
+  });
 });

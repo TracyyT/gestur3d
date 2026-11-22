@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { cn } from '@/ui';
 
 /** `locked`: not available yet (grayed). `active`: waiting on the user, with progress. */
@@ -10,6 +11,8 @@ export interface CheckItem {
   state: CheckState;
   /** 0..1, shown as a filling ring when state is `active`. */
   progress?: number;
+  /** Extra content under the detail (e.g. a demo). */
+  extra?: ReactNode;
 }
 
 function Mark({ state, progress = 0 }: { state: CheckState; progress?: number }) {
@@ -82,9 +85,16 @@ const srState: Record<CheckState, string> = {
   active: 'ready',
 };
 
-export function CalibrationChecklist({ items }: { items: CheckItem[] }) {
+export function CalibrationChecklist({
+  items,
+  label = 'Calibration checks',
+}: {
+  items: CheckItem[];
+  /** Screen-reader name of the list. */
+  label?: string;
+}) {
   return (
-    <ul className="space-y-3" aria-label="Calibration checks">
+    <ul className="space-y-3" aria-label={label}>
       {items.map((item) => (
         <li
           key={item.id}
@@ -93,16 +103,19 @@ export function CalibrationChecklist({ items }: { items: CheckItem[] }) {
           <span className="mt-0.5">
             <Mark state={item.state} progress={item.progress} />
           </span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p
               className={cn('text-[14px]', item.state === 'pending' ? 'text-ink-2' : 'text-ink-1')}
             >
               {item.label}
               <span className="sr-only">: {srState[item.state]}</span>
             </p>
-            <p className="mt-0.5 text-[12.5px] text-ink-3" aria-live="polite">
-              {item.detail}
-            </p>
+            {item.detail && (
+              <p className="mt-0.5 text-[12.5px] text-ink-3" aria-live="polite">
+                {item.detail}
+              </p>
+            )}
+            {item.extra}
           </div>
         </li>
       ))}
