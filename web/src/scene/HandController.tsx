@@ -18,6 +18,8 @@ import { useSettings } from '@/stores/settings';
 import { GestureMenuController } from '@/features/menu/gestureMenu';
 import { isOpenHand } from '@/core/gestures/rules/handPoses';
 import { useMenu } from '@/features/menu/menuStore';
+import { DrawController } from '@/core/drawing/drawController';
+import { DRAW_PLANE_ORIGIN, drawRuntime, useDraw } from '@/features/drawing/drawStore';
 import { visibleSceneRect } from './framing';
 import { objectRegistry } from './objectRegistry';
 
@@ -36,6 +38,7 @@ export function HandController() {
   const tracker = useMemo(() => new HandTracker(), []);
   const engine = useMemo(() => new HandInteractionEngine(), []);
   const gestureMenu = useMemo(() => new GestureMenuController(), []);
+  const drawing = useMemo(() => new DrawController(), []);
   const queue = useRef<HandFrame[]>([]);
   const display = useRef(new Map<number, { x: number; y: number }>());
   const config = useRef('');
@@ -69,10 +72,12 @@ export function HandController() {
       tracker.reset();
       engine.reset();
       gestureMenu.reset();
+      drawing.reset();
+      drawRuntime.reset();
       shown.clear();
       handRuntime.reset();
     };
-  }, [source, tracker, engine, gestureMenu]);
+  }, [source, tracker, engine, gestureMenu, drawing]);
 
   // Expose projection for the cursor overlay's tether line and test hooks.
   useEffect(() => {
@@ -183,6 +188,31 @@ export function HandController() {
       }
       return r;
     };
+    // Draw tool: pinches in empty space become strokes (after the engine, so
+    // a pinch that grabs an object stays a grab).
+    const draw = useDraw.getState();
+    const drawActive = draw.active && !useMenu.getState().open;
+    const runDraw = (t: number, inputs: PointerInput[], r: ReturnType<typeof run>) => {
+      if (!drawActive && drawing.live.size === 0) return;
+      const pens = inputs.map((i) => ({
+        id: i.id,
+        lost: i.status === 'lost',
+        screen: i.screen,
+        pinch: i.pinch,
+        grabbing: r.pointers.some((p) => p.id === i.id && p.grabbedId !== null),
+      }));
+      const u = drawing.update(t, drawActive, pens, (sp) =>
+        query.planePoint(sp, DRAW_PLANE_ORIGIN),
+      );
+      for (const points of u.finished) {
+        scene.dispatch({ type: 'addStroke', points, color: draw.color }, 'gesture');
+      }
+      if (u.changed) {
+        drawRuntime.live.clear();
+        for (const [id, b] of drawing.live) drawRuntime.live.set(id, b.points);
+        drawRuntime.version++;
+      }
+    };
 
     // Interaction logic runs once per DETECTION, in order, so it never depends
     // on the render rate: a render stall can't drop a grab, skip the last
@@ -191,7 +221,9 @@ export function HandController() {
     const batch = queue.current.splice(0);
     for (const f of batch) {
       const frameTracks = tracker.update(f, aspect);
-      result = run(f.timestamp, toInputs(frameTracks, true));
+      const inputs = toInputs(frameTracks, true);
+      result = run(f.timestamp, inputs);
+      runDraw(f.timestamp, inputs, result);
       gestureMenu.update(f.timestamp, frameTracks, result, rect, settings.palmMenu);
       handRuntime.frames.tick(now);
       handRuntime.latency.tick(now, now - (f.captureTime ?? f.timestamp));
@@ -208,7 +240,11 @@ export function HandController() {
     const expireAt = flowing ? lastFrame.current.ts : now;
     const before = tracker.snapshot().length;
     const tracks = tracker.expire(expireAt);
-    if (!result || tracks.length !== before) result = run(expireAt, toInputs(tracks, false));
+    if (!result || tracks.length !== before) {
+      const inputs = toInputs(tracks, false);
+      result = run(expireAt, inputs);
+      runDraw(expireAt, inputs, result);
+    }
 
     const mode: InteractionMode = result.twoHand.some((t) => t.mode === 'two')
       ? 'twoHand'

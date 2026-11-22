@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react';
+import { useDraw } from '@/features/drawing/drawStore';
 import { useHudLayout } from '@/stores/hudLayout';
 import { IconButton } from '@/ui';
 import { CameraPreview } from './CameraPreview';
@@ -11,6 +12,8 @@ import { TrackingPanel } from './TrackingPanel';
 /** Workspace overlay: status readouts, side panels and the camera preview. */
 export function Hud() {
   const { panelsVisible, setPanelsVisible } = useHudLayout();
+  const drawing = useDraw((s) => s.active);
+  const toggleDraw = useDraw((s) => s.toggle);
 
   return (
     <>
@@ -21,6 +24,23 @@ export function Hud() {
         <div className="pointer-events-auto">
           <StatusCluster />
         </div>
+        <IconButton
+          label="Draw"
+          title="Draw (D)"
+          active={drawing}
+          onClick={toggleDraw}
+          className="glass pointer-events-auto size-9 rounded-full"
+        >
+          <svg aria-hidden viewBox="0 0 16 16" className="size-4">
+            <path
+              d="M3 13c2-1 3-4 5-6s4-3 5-2-1 3-3 5-5 3-7 3z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </IconButton>
         <IconButton
           label={panelsVisible ? 'Hide panels' : 'Show panels'}
           active={panelsVisible}

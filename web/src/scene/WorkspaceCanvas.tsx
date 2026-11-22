@@ -8,6 +8,7 @@ import { useSettings } from '@/stores/settings';
 import { HoloLab } from './environments/HoloLab';
 import { FrameProbe } from './FrameProbe';
 import { HandController } from './HandController';
+import { LiveStrokes } from './LiveStrokes';
 import { PanelAwareFraming } from './PanelAwareFraming';
 import { HoloObject } from './objects/HoloObject';
 
@@ -67,6 +68,7 @@ export default function WorkspaceCanvas() {
       <FrameProbe />
       <PanelAwareFraming instant={reducedMotion} />
       <HandController />
+      <LiveStrokes />
       <HoloLab particleDensity={particleDensity} />
       <SceneObjects instant={reducedMotion} onHoverChange={onHoverChange} />
       <OrbitControls

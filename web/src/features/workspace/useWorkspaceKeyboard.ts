@@ -1,5 +1,6 @@
 import { useCallback, type KeyboardEvent } from 'react';
 import { keyToCommand } from '@/core/interaction/keyboard';
+import { useDraw } from '@/features/drawing/drawStore';
 import { useMenu } from '@/features/menu/menuStore';
 import { visibleSceneRect } from '@/scene/framing';
 import { useHudLayout } from '@/stores/hudLayout';
@@ -52,6 +53,12 @@ export function useWorkspaceKeyboard(onToggleHelp: () => void) {
           window.innerHeight,
         );
         menu.openAt(r.left + r.width / 2, r.top + r.height / 2, 'keyboard');
+        return;
+      }
+
+      if ((e.key === 'd' || e.key === 'D') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        useDraw.getState().toggle();
         return;
       }
 
