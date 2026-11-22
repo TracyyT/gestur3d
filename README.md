@@ -2,7 +2,7 @@
 
 **A holographic 3D workspace you control with your hands through a webcam.** Grab, rotate and scale floating objects, draw in the air, and trigger effects with gestures. Hand tracking runs locally in the browser. The gesture classifiers are trained from scratch in PyTorch on a purpose-built landmark dataset and run in the browser via ONNX.
 
-> **Status: Milestone 2 (hand tracking and manipulation) complete.** Pinch to grab, move and release objects with either hand, with mouse and keyboard as a full fallback. Two-hand scaling and rotation come in Milestone 3. See the [roadmap](#roadmap).
+> **Status: Milestone 3 (advanced interactions) complete.** Grab with one hand, scale, turn and push objects with two, draw in the air, and use a radial menu by pointing, with mouse and keyboard as a full fallback. See the [roadmap](#roadmap).
 
 ## What works today
 
@@ -13,10 +13,13 @@
   - Accurate at any window size and with the side panels open: the hand maps onto the visible scene area, and picking uses the same camera projection as rendering.
   - One Euro smoothing (adjustable), a "reach" setting for how far you move, and a 300 ms grace that freezes held objects through brief tracking dropouts.
   - Detection runs on the main thread by default (measured faster than the Web Worker, which stays available as a setting). The tracking panel shows backend, detection rate, inference time and end-to-end latency, and can record landmarks (never video).
+- **Two hands**: pinch an object with one hand and anywhere with the other, then spread to scale, turn to rotate, and move both hands toward or away from the camera to push or pull. Or hold the other hand open over the object to push and pull with one hand.
+- **Radial menu**: point (index finger up) and hold still to open it at your hand, or press M. Add one of nine shapes, Draw, Color, Undo, Delete, or Clear drawings. Sectors are sticky, so small movements don't jump to a neighbor.
+- **Air drawing**: turn on Draw (button, D or the menu) and pinch empty space to draw a glowing stroke, or drag with the mouse. Drawings are objects: select, move, scale, recolor, delete and undo them.
 - **Workspace**: holographic lab environment with directly manipulable objects
   - Mouse: click to select, drag to move, Shift-drag to rotate, scroll to scale, drag empty space to orbit
-  - Keyboard: Tab cycles objects, arrows move, Q/E/W/S rotate, +/− scale, Delete removes, ? shows controls
-  - HUD: measured render FPS and frame time, current mode, Objects and Settings panels, and a draggable camera preview
+  - Keyboard: Tab cycles objects, arrows move, Q/E/W/S rotate, +/− scale, Delete removes, Ctrl/⌘ Z undoes, M opens the menu, D toggles Draw, ? shows controls
+  - HUD: measured render FPS and frame time, draw calls and triangles, current mode, Objects and Settings panels, and a draggable camera preview
 - **Privacy**: the camera turns off when you leave setup or the workspace. No frames are stored or uploaded. Models and the wasm runtime are self-hosted.
 - **Accessibility**: every action works without gestures, focus is never trapped, selection changes are announced, and reduced motion follows the OS setting with an in-app override.
 
@@ -84,7 +87,8 @@ Open `http://localhost:5173`. Camera access needs `localhost` or HTTPS. Desktop 
 
 - **Unit (Vitest):** command reducer, keyboard mapping, camera error handling, calibration math, rate meters, settings, UI components, landmark normalization (property tests and golden vectors)
 - **End-to-end (Playwright, fake camera):** landing → setup, the camera on/off flow and turning it off on navigation, keyboard control without focus traps, panels, settings persistence
-- **Hand interaction (Playwright + scripted landmarks):** grab/move/release at four window sizes, panels open and hidden, both hands; tracking dropouts; swept pinches and idle hands never grab. Where the hand model is available (CI), a test also checks that live detection starts in the workspace.
+- **Hand interaction (Playwright + scripted landmarks):** grab/move/release at four window sizes, panels open and hidden, both hands; tracking dropouts; swept pinches and idle hands never grab; two-hand scale, turn, depth and hand loss; opening and using the menu by pointing; drawing with hands and the mouse.
+- **Measurements (Vitest):** cursor jitter and lag, and per-detection cost of drags, two-hand grabs and drawing Where the hand model is available (CI), a test also checks that live detection starts in the workspace.
 - CI runs everything on every pull request.
 
 Performance numbers are recorded in [docs/benchmarks.md](docs/benchmarks.md). Only measured values go there.
@@ -95,7 +99,7 @@ Performance numbers are recorded in [docs/benchmarks.md](docs/benchmarks.md). On
 | --------------------------------- | ----------------------------------------------------------------------------- | ------- |
 | M1 Foundation                     | Repo, design system, landing, camera setup, mouse/keyboard workspace, HUD     | ✅ Done |
 | M2 Hand tracking and manipulation | Detection pipeline, smoothing, pinch grab/move/release, landmark recorder     | ✅ Done |
-| M3 Advanced interactions          | Two-hand scale/rotate, air drawing, radial menu, state engine, rule baselines | Next    |
+| M3 Advanced interactions          | Two-hand scale/rotate, air drawing, radial menu, state engine, rule baselines | ✅ Done |
 | M4 Dataset collection tool        | Record, label, review and export samples, multi-participant consent           | Planned |
 | M5 Model training                 | Static MLP and dynamic GRU/TCN, participant-grouped splits, ONNX in browser   | Planned |
 | M6 Effects and environments       | Particles, four environments, object library, adaptive quality                | Planned |
