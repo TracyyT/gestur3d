@@ -261,4 +261,27 @@ describe('addStroke', () => {
     const inv = inverseOf(m, cmd)!;
     expect(applyCommand(applyCommand(m, cmd), inv).objects).toEqual(m.objects);
   });
+
+  it('Clear removes every drawing, and one undo puts them all back in place', () => {
+    let m = createInitialScene();
+    m = applyCommand(m, { type: 'addStroke', points: circle() });
+    m = applyCommand(m, { type: 'add', kind: 'ring' });
+    m = applyCommand(m, { type: 'addStroke', points: circle(6) });
+    m = applyCommand(m, { type: 'select', id: m.objects.at(-1)!.id });
+    const cmd = { type: 'clearStrokes' } as const;
+    const inv = inverseOf(m, cmd)!;
+    const cleared = applyCommand(m, cmd);
+    expect(cleared.objects.some((o) => o.kind === 'stroke')).toBe(false);
+    expect(cleared.objects).toHaveLength(4);
+    expect(cleared.selectedId).toBeNull();
+    const back = applyCommand(cleared, inv);
+    expect(back.objects).toEqual(m.objects);
+    expect(back.selectedId).toBe(m.selectedId);
+  });
+
+  it('Clear with no drawings changes nothing and is not an undo step', () => {
+    const m = createInitialScene();
+    expect(applyCommand(m, { type: 'clearStrokes' })).toBe(m);
+    expect(inverseOf(m, { type: 'clearStrokes' })).toBeNull();
+  });
 });

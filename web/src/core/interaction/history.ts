@@ -6,7 +6,7 @@ export const UNDO_LIMIT = 50;
 /**
  * The command that undoes `cmd`, given the scene before it ran, or null if
  * `cmd` isn't an undoable step. Undo covers structural changes (adding,
- * removing, recoloring), not continuous moves, which are easy to redo by hand
+ * removing, recoloring, clearing drawings), not continuous moves, which are easy to redo by hand
  * and would flood the history.
  */
 export function inverseOf(before: SceneModel, cmd: Command): Command | null {
@@ -27,6 +27,12 @@ export function inverseOf(before: SceneModel, cmd: Command): Command | null {
     case 'setColor': {
       const o = before.objects.find((x) => x.id === cmd.id);
       return o ? { type: 'setColor', id: cmd.id, color: o.color ?? null } : null;
+    }
+    case 'clearStrokes': {
+      const items = before.objects.flatMap((object, index) =>
+        object.kind === 'stroke' ? [{ object, index }] : [],
+      );
+      return items.length ? { type: 'restoreMany', items, selectedId: before.selectedId } : null;
     }
     default:
       return null;

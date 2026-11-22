@@ -7,6 +7,7 @@ import {
   type MenuHit,
 } from '@/core/interaction/radialMenu';
 import { OBJECT_KINDS } from '@/core/interaction/sceneModel';
+import { useDraw } from '@/features/drawing/drawStore';
 import { useScene } from '@/stores/scene';
 
 export type MenuOpener = 'keyboard' | 'hand';
@@ -20,20 +21,22 @@ export function outerItems(action: MenuAction): readonly (ShapeKind | HoloColor)
   return null;
 }
 
-/** Whether an action can run right now. Draw and Clear arrive with air drawing. */
+/** Whether an action can run right now. */
 export function actionEnabled(action: MenuAction): boolean {
   const scene = useScene.getState();
   switch (action) {
     case 'add':
+    case 'draw':
       return true;
     case 'color':
+      // Recolors the selection, or sets the pen color while drawing.
+      return scene.selectedId !== null || useDraw.getState().active;
     case 'delete':
       return scene.selectedId !== null;
     case 'undo':
       return scene.undoStack.length > 0;
-    case 'draw':
     case 'clear':
-      return false;
+      return scene.objects.some((o) => o.kind === 'stroke');
   }
 }
 
@@ -66,11 +69,19 @@ function run(action: MenuAction, outerIndex: number | null) {
   if (items && outerIndex !== null) {
     const choice = items[outerIndex]!;
     if (action === 'add') scene.dispatch({ type: 'add', kind: choice as ShapeKind }, 'ui');
-    if (action === 'color' && scene.selectedId)
-      scene.dispatch({ type: 'setColor', id: scene.selectedId, color: choice as HoloColor }, 'ui');
+    if (action === 'color') {
+      if (scene.selectedId)
+        scene.dispatch(
+          { type: 'setColor', id: scene.selectedId, color: choice as HoloColor },
+          'ui',
+        );
+      else useDraw.getState().setColor(choice as HoloColor);
+    }
     return;
   }
   if (action === 'undo') scene.undo('ui');
+  if (action === 'draw') useDraw.getState().toggle();
+  if (action === 'clear') scene.dispatch({ type: 'clearStrokes' }, 'ui');
   if (action === 'delete' && scene.selectedId)
     scene.dispatch({ type: 'remove', id: scene.selectedId }, 'ui');
 }

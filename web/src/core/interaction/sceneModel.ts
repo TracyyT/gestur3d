@@ -258,6 +258,24 @@ export function applyCommand(model: SceneModel, cmd: Command): SceneModel {
         selectedId: cmd.selected ? cmd.object.id : model.selectedId,
       };
     }
+    case 'clearStrokes': {
+      const objects = model.objects.filter((o) => o.kind !== 'stroke');
+      if (objects.length === model.objects.length) return model;
+      const keep = objects.some((o) => o.id === model.selectedId);
+      return { ...model, objects, selectedId: keep ? model.selectedId : null };
+    }
+    case 'restoreMany': {
+      const objects = [...model.objects];
+      let changed = false;
+      for (const { object, index } of cmd.items) {
+        if (objects.some((o) => o.id === object.id)) continue;
+        objects.splice(Math.min(Math.max(0, index), objects.length), 0, object);
+        changed = true;
+      }
+      if (!changed) return model;
+      const selected = objects.some((o) => o.id === cmd.selectedId);
+      return { ...model, objects, selectedId: selected ? cmd.selectedId : model.selectedId };
+    }
     case 'reset':
       return createInitialScene();
   }

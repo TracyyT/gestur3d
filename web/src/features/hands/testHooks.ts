@@ -173,6 +173,7 @@ export function installTestHooks() {
     objects: () =>
       useScene.getState().objects.map((o) => ({
         id: o.id,
+        kind: o.kind,
         position: [...o.position],
         rotation: [...o.rotation],
         scale: o.scale,
