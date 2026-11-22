@@ -327,4 +327,89 @@ describe('two-hand grabs', () => {
     expect(world.poses.get('a')!.scale).toBeCloseTo(scale, 9);
     expect(dist(world.pos(), pos)).toBeLessThan(1e-9);
   });
+
+  describe('open-hand depth', () => {
+    /** Hand 2 open (not pinching) at (x, y) with palm size `palm`. */
+    const openHand = (x: number, y: number, palm: number, open = true) =>
+      hand(2, x, y, OPEN, { palm, open });
+    const holder = (x = 190, p = HOLD) => hand(1, x, 200, p, { palm: 0.1, open: false });
+
+    /** Hand 1 grabs `a`; hand 2 waits open over it until depth takes over. */
+    function engage() {
+      const r = rig();
+      r.step(hand(1, 190, 200, OPEN), openHand(600, 500, 0.1));
+      r.step(holder(190, START), openHand(600, 500, 0.1));
+      for (let i = 0; i < 10; i++) r.step(holder(), openHand(215, 200, 0.1));
+      return r;
+    }
+
+    it('takes over after the open hand stays over the held object for 250 ms', () => {
+      const { step } = rig();
+      step(hand(1, 190, 200, OPEN), openHand(600, 500, 0.1));
+      step(holder(190, START), openHand(600, 500, 0.1));
+      // 5 frames (165 ms): not yet.
+      let r!: EngineResult;
+      for (let i = 0; i < 5; i++) r = step(holder(), openHand(215, 200, 0.1));
+      expect(r.depth).toHaveLength(0);
+      for (let i = 0; i < 5; i++) r = step(holder(), openHand(215, 200, 0.1));
+      expect(r.depth).toEqual([{ objectId: 'a', holderId: 1, handId: 2, depth: 0 }]);
+    });
+
+    it('bringing the open hand closer brings the object closer; the holder still moves it', () => {
+      const { world, step } = engage();
+      const before = [...world.pos()] as Vec3;
+      for (let i = 0; i < 60; i++) step(holder(), openHand(215, 200, 0.125));
+      const dz = world.pos()[2] - before[2];
+      expect(dz).toBeCloseTo(4 * (Math.log(1.25) - 0.03), 2);
+      // Holding hand moves it sideways at the new depth.
+      step(holder(290), openHand(215, 200, 0.125));
+      expect(world.pos()[0]).toBeCloseTo(before[0] + 1);
+      expect(world.pos()[2]).toBeCloseTo(before[2] + dz, 3);
+    });
+
+    it('pulling the open hand back sends the object away', () => {
+      const { world, step } = engage();
+      const z0 = world.pos()[2];
+      for (let i = 0; i < 60; i++) step(holder(), openHand(215, 200, 0.08));
+      expect(world.pos()[2]).toBeLessThan(z0 - 0.5);
+    });
+
+    it('ends when the open hand closes, keeping the new depth without a jump', () => {
+      const { world, step } = engage();
+      for (let i = 0; i < 60; i++) step(holder(), openHand(215, 200, 0.125));
+      const at = [...world.pos()] as Vec3;
+      let r!: EngineResult;
+      for (let i = 0; i < 10; i++) r = step(holder(), openHand(215, 200, 0.125, false));
+      expect(r.depth).toHaveLength(0);
+      expect(dist(world.pos(), at)).toBeLessThan(1e-9);
+      step(holder(290), openHand(600, 500, 0.125, false));
+      expect(world.pos()[0]).toBeCloseTo(at[0] + 1);
+      expect(world.pos()[2]).toBeCloseTo(at[2], 9);
+    });
+
+    it('a pinch by the open hand turns it into a two-hand grab, without a jump', () => {
+      const { world, step } = engage();
+      for (let i = 0; i < 60; i++) step(holder(), openHand(215, 200, 0.125));
+      const at = [...world.pos()] as Vec3;
+      const r = step(holder(), hand(2, 215, 200, START, { palm: 0.125, open: false }));
+      expect(r.depth).toHaveLength(0);
+      expect(r.twoHand).toHaveLength(1);
+      expect(dist(world.pos(), at)).toBeLessThan(1e-9);
+    });
+
+    it('an open hand that is not over the object, or only passing, does nothing', () => {
+      const { world, step } = rig();
+      step(hand(1, 190, 200, OPEN), openHand(600, 500, 0.1));
+      step(holder(190, START), openHand(600, 500, 0.1));
+      const z0 = world.pos()[2];
+      let r!: EngineResult;
+      for (let i = 0; i < 30; i++) r = step(holder(), openHand(600, 500, 0.13));
+      expect(r.depth).toHaveLength(0);
+      // Passing over for 3 frames, then away.
+      for (let i = 0; i < 3; i++) r = step(holder(), openHand(215, 200, 0.13));
+      for (let i = 0; i < 10; i++) r = step(holder(), openHand(600, 500, 0.13));
+      expect(r.depth).toHaveLength(0);
+      expect(world.pos()[2]).toBe(z0);
+    });
+  });
 });

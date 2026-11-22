@@ -162,6 +162,22 @@ export function HandCursorOverlay() {
     const updateChip = () => {
       if (!chip) return;
       const t = handRuntime.twoHand.find((x) => x.mode === 'two');
+      // Open-hand depth: how far the object moved, above the open hand.
+      const dz = !t ? handRuntime.depth[0] : undefined;
+      const dh = dz && handRuntime.pointers.find((p) => p.id === dz.handId);
+      if (dz && dh) {
+        const amount = Math.abs(dz.depth);
+        const text =
+          amount < 0.05 ? 'Depth' : `${amount.toFixed(1)} ${dz.depth > 0 ? 'closer' : 'farther'}`;
+        if (text !== chipText) {
+          chip.textContent = text;
+          chipText = text;
+        }
+        chip.dataset.limit = 'false';
+        chip.style.opacity = '1';
+        chip.style.transform = `translate(${dh.screen.x}px, ${dh.screen.y - 40}px) translate(-50%, -50%)`;
+        return;
+      }
       const a = t && handRuntime.pointers.find((p) => p.id === t.pointerIds[0]);
       const b = t && handRuntime.pointers.find((p) => p.id === t.pointerIds[1]);
       if (!t || !a || !b) {
@@ -304,6 +320,25 @@ export function HandCursorOverlay() {
               -Math.PI / 2,
               -Math.PI / 2 + Math.PI * 2 * Math.min(1, p.pinchStrength),
             );
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        // Open hand setting depth: arrows above and below the cursor.
+        if (handRuntime.depth.some((d) => d.handId === p.id)) {
+          ctx.save();
+          ctx.globalAlpha = 0.9 * appear;
+          ctx.strokeStyle = palette.ink1;
+          ctx.lineWidth = 1.75;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          for (const dir of [-1, 1]) {
+            const tip = y + dir * (r + 10);
+            ctx.beginPath();
+            ctx.moveTo(x - 4, tip - dir * 4);
+            ctx.lineTo(x, tip);
+            ctx.lineTo(x + 4, tip - dir * 4);
             ctx.stroke();
           }
           ctx.restore();
