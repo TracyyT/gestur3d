@@ -452,9 +452,9 @@ test.describe('two-hand grab', () => {
     const samples = await playSampled(page, right, left);
     const after = await cube(page);
     const dz = after.position[2] - before.position[2];
-    // 4 × (ln 1.25 − 0.03) ≈ 0.77 toward the camera, give or take smoothing.
-    expect(dz).toBeGreaterThan(0.6);
-    expect(dz).toBeLessThan(0.85);
+    // 8 × (ln 1.25 − 0.03) ≈ 1.55 toward the camera, give or take smoothing.
+    expect(dz).toBeGreaterThan(1.3);
+    expect(dz).toBeLessThan(1.7);
     expect(after.scale).toBeCloseTo(before.scale, 6);
     expect(samples.some((s) => s.hud === 'Depth')).toBe(true);
     expect(samples.some((s) => /closer$/.test(s.chip ?? ''))).toBe(true);
