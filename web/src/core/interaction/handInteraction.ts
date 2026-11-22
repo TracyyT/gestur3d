@@ -152,8 +152,8 @@ export const DEPTH_HAND = {
   engageMs: 250,
   /** Brief non-open frames (a finger flicker) don't end it. */
   exitMs: 200,
-  /** World units per unit of log palm-size change. */
-  gain: 4,
+  /** World units per unit of log palm-size change (same as two-hand depth). */
+  gain: 8,
   /**
    * The open hand counts as "over" the object within this × its on-screen
    * radius of its center, and never less than `minZonePx`, so small objects

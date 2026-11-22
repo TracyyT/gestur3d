@@ -378,7 +378,7 @@ describe('two-hand grabs', () => {
       const before = [...world.pos()] as Vec3;
       for (let i = 0; i < 60; i++) step(holder(), openHand(215, 200, 0.125));
       const dz = world.pos()[2] - before[2];
-      expect(dz).toBeCloseTo(4 * (Math.log(1.25) - 0.03), 2);
+      expect(dz).toBeCloseTo(8 * (Math.log(1.25) - 0.03), 2);
       // Holding hand moves it sideways at the new depth.
       step(holder(290), openHand(215, 200, 0.125));
       expect(world.pos()[0]).toBeCloseTo(before[0] + 1);
