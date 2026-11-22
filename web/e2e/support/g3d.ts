@@ -44,6 +44,7 @@ export interface G3D {
   playTwoHand(s: { right: HandKey[]; left: HandKey[] }): Promise<void>;
   playHand(keys: HandKey[], handedness?: Handedness): Promise<void>;
   addStroke(points: Vec3[]): void;
+  session(): Array<Record<string, unknown> & { t: number; type: string }>;
 }
 
 declare global {

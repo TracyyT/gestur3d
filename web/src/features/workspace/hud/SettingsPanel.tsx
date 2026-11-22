@@ -1,4 +1,5 @@
 import { useSettings, type ReducedMotionPreference, type VisualQuality } from '@/stores/settings';
+import { SessionSection } from '@/features/session/SessionSection';
 import { Button, Panel, Select, Slider, Toggle } from '@/ui';
 
 const QUALITY: Array<{ value: VisualQuality; label: string }> = [
@@ -92,6 +93,8 @@ export function SettingsPanel() {
             onChange={(v) => s.set('showDebugOverlay', v)}
           />
         </section>
+
+        <SessionSection />
 
         <div className="border-t border-line pt-3">
           <Button size="sm" variant="ghost" onClick={s.reset}>

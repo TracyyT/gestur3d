@@ -8,6 +8,7 @@ import { HandCursorOverlay } from '@/features/hands/HandCursorOverlay';
 import { RadialMenu } from '@/features/menu/RadialMenu';
 import { installTestHooks } from '@/features/hands/testHooks';
 import { useLiveHandSource } from '@/features/hands/useLiveHandSource';
+import { recordSession } from '@/features/session/session';
 import { Hud } from '@/features/workspace/hud/Hud';
 import type { ModeId } from './modes';
 import { ShortcutsDialog } from './ShortcutsDialog';
@@ -87,6 +88,7 @@ export function ModeShell({ mode, sceneLabel, scene, hint, children }: ModeShell
   const onKeyDown = useSceneKeyboard(toggleHelp);
   useLiveHandSource();
   useEffect(installTestHooks, []);
+  useEffect(() => recordSession(mode), [mode]);
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-void" data-mode={mode}>
