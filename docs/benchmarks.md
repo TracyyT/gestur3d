@@ -72,3 +72,41 @@ Values in brackets are occasional dips or peaks. The worker run used a productio
 | Setup page + MediaPipe JS              | 171 kB   | 52 kB   | `/setup`                       |
 | MediaPipe wasm runtime                 | 14.7 MB  | n/a     | `/setup` (self-hosted)         |
 | Hand landmarker model                  | 7.8 MB   | n/a     | `/setup` (self-hosted)         |
+
+## Milestone 3: two hands, menu and drawing
+
+### Interaction cost per detection (synthetic)
+
+From `web/src/core/interaction/engine.measure.test.ts`, 3000 detections each, measured 2026-11-21 at commit `6d0ac2c` in Node on a CI-class cloud CPU (not the reference machine). Budgets in the test catch regressions of 10× or more.
+
+| Work                                | Mean   | p99    |
+| ----------------------------------- | ------ | ------ |
+| One hand dragging an object         | ~4 µs  | ~4 µs  |
+| Two hands scaling and turning       | ~8 µs  | ~40 µs |
+| Drawing, per detection              | ~2 µs  | ~2 µs  |
+| Finishing a 2000-point stroke       | 0.6 ms |        |
+| Adding the finished stroke to scene | 0.4 ms |        |
+
+Finishing a long stroke took 7–11 ms before #63, enough to drop a frame on release. It now thins raw points before smoothing, and the simplifier no longer allocates.
+
+### Scene cost (draw calls and triangles)
+
+From the Tracking panel, which counts every pass (scene and bloom) in a frame. Counts don't depend on the machine.
+
+| Scene                       | Draw calls | Triangles |
+| --------------------------- | ---------- | --------- |
+| Default scene, quality High | 26         | 11k       |
+| Plus 10 drawings            | 36         | 18k       |
+
+Each drawing costs one draw call and about 700 triangles; the 40-drawing cap bounds this at about +40 calls and +28k triangles.
+
+### On the reference MacBook Pro
+
+| Metric                                         | Value | Notes            |
+| ---------------------------------------------- | ----- | ---------------- |
+| Render FPS, two-hand scale + rotate            |       | Not measured yet |
+| Render FPS while drawing, 40 drawings in scene |       | Not measured yet |
+| Two-hand scale jitter, hands still (RMS)       |       | Not measured yet |
+| Menu opened by accident, 2 min of normal use   |       | Not measured yet |
+
+How to measure the last two: record landmarks from the Tracking panel while holding an object still with two hands for 10 s, and during 2 minutes of ordinary grabbing and drawing; the recordings replay in tests.
