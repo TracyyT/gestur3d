@@ -30,7 +30,7 @@ flowchart TD
   cam[Webcam] --> vision["Vision source<br/>MediaPipe Hand Landmarker<br/>(main thread or Web Worker)"]
   replay[Recorded landmarks] -.-> tracking
   vision --> tracking["Tracking<br/>coordinates, smoothing, hand identity (M2)"]
-  tracking --> recog["Gesture recognition<br/>geometric + trained MLP / GRU via ONNX (M2–M5)"]
+  tracking --> recog["Gesture recognition<br/>geometric + trained MLP / GRU via ONNX (M2–M7)"]
   recog --> engine["Interaction state engine (M3)"]
   engine -->|Commands| store[Scene store]
   mk[Mouse + keyboard] -->|same Commands| store
@@ -60,7 +60,7 @@ web/                  Vite + React + TypeScript app
   e2e/                Playwright tests (run with a fake camera)
   scripts/            prepare-models: self-hosts MediaPipe assets
 shared/landmark-spec/ landmark spec, reference normalization, golden vectors
-ml/                   Python: dataset processing, training, evaluation (M4–M5)
+ml/                   Python: dataset processing, training, evaluation (M5–M7)
 docs/                 ADRs and benchmarks
 ```
 
@@ -95,19 +95,25 @@ Performance numbers are recorded in [docs/benchmarks.md](docs/benchmarks.md). On
 
 ## Roadmap
 
-| Milestone                         | Scope                                                                         | Status  |
-| --------------------------------- | ----------------------------------------------------------------------------- | ------- |
-| M1 Foundation                     | Repo, design system, landing, camera setup, mouse/keyboard workspace, HUD     | ✅ Done |
-| M2 Hand tracking and manipulation | Detection pipeline, smoothing, pinch grab/move/release, landmark recorder     | ✅ Done |
-| M3 Advanced interactions          | Two-hand scale/rotate, air drawing, radial menu, state engine, rule baselines | ✅ Done |
-| M4 Dataset collection tool        | Record, label, review and export samples, multi-participant consent           | Planned |
-| M5 Model training                 | Static MLP and dynamic GRU/TCN, participant-grouped splits, ONNX in browser   | Planned |
-| M6 Effects and environments       | Particles, four environments, object library, adaptive quality                | Planned |
-| M7 AR mode and launch             | Face filters, accessibility pass, benchmarks, deploy                          | Planned |
+Gestur3D is growing into three modes on one shared gesture and interaction engine: **Practice** (guided lessons), **Playground** (rebuild target figures, level by level) and **Workspace** (import, inspect and annotate 3D models). Practice is recommended but optional, and mouse controls stay available where they make sense.
+
+| Milestone                         | Scope                                                                                   | Status  |
+| --------------------------------- | --------------------------------------------------------------------------------------- | ------- |
+| M1 Foundation                     | Repo, design system, landing, camera setup, mouse/keyboard workspace, HUD               | ✅ Done |
+| M2 Hand tracking and manipulation | Detection pipeline, smoothing, pinch grab/move/release, landmark recorder               | ✅ Done |
+| M3 Advanced interactions          | Two-hand scale/rotate/depth, air drawing, radial menu, undo, rule baselines             | ✅ Done |
+| M4 Modes and Practice             | Mode shell and navigation, session log, 7 lessons + optional push/pull, free practice   | Next    |
+| M5 Dataset collection tool        | Participant IDs, consent, static and dynamic samples, review, export; landmarks only    | Planned |
+| M6 Playground                     | Level-based building puzzles, target previews, snapping, time and accuracy scoring      | Planned |
+| M7 Model training                 | Static MLP and dynamic GRU/TCN, participant-separated splits, ONNX, beat rule baselines | Planned |
+| M8 Workspace models               | glTF/GLB import, part selection, labels and drawings as annotations, saved projects     | Planned |
+| M9 Study and launch               | Gesture vs mouse study mode, accessibility and performance passes, deploy               | Planned |
+
+Playground starts with roll-only rotation so every level is playable by hand; rotation is built per axis so yaw and pitch can follow once tracking supports them. Visual effects are polish within each mode, and AR face filters are deferred.
 
 ## Privacy
 
 - Video is processed on your device and never recorded, stored or uploaded.
 - The camera only runs on the setup and workspace screens. It turns off when you leave them, when you close the tab, or when you press the camera-off button.
 - MediaPipe's runtime and models are served from this site, not a third-party CDN.
-- The dataset tool (M4) will store **landmarks only, never video**, and only with explicit consent.
+- The dataset tool (M5) will store **landmarks only, never video**, and only with explicit consent. Donating Practice attempts is opt-in and off by default.
