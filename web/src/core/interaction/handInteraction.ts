@@ -60,6 +60,8 @@ export interface SceneQuery {
   objectPosition(id: string): Vec3 | null;
   /** Full pose; defaults to the position with no rotation and scale 1. */
   objectPose?(id: string): Pose | null;
+  /** The object's on-screen center and radius (px), if known. */
+  objectScreen?(id: string): { x: number; y: number; r: number } | null;
   /** Camera axes in world space; defaults to +X right, +Y up. */
   view?(): ViewBasis;
 }
@@ -144,6 +146,13 @@ export const DEPTH_HAND = {
   exitMs: 200,
   /** World units per unit of log palm-size change. */
   gain: 4,
+  /**
+   * The open hand counts as "over" the object within this × its on-screen
+   * radius of its center, and never less than `minZonePx`, so small objects
+   * don't need both hands squeezed onto them.
+   */
+  zoneScale: 1.8,
+  minZonePx: 150,
   deadZone: 0.03,
   filter: { minCutoff: 0.6, beta: 0.3, dCutoff: 1.0 },
 } as const;
@@ -469,9 +478,13 @@ export class HandInteractionEngine {
         continue;
       }
 
-      const over = inputs.find(
-        (p) => qualifies(p) && p.inBox && scene.pick(p.screen) === grab.objectId,
-      );
+      const zone = scene.objectScreen?.(grab.objectId);
+      const near = (p: PointerInput) =>
+        scene.pick(p.screen) === grab.objectId ||
+        (!!zone &&
+          Math.hypot(p.screen.x - zone.x, p.screen.y - zone.y) <=
+            Math.max(zone.r * DEPTH_HAND.zoneScale, DEPTH_HAND.minZonePx));
+      const over = inputs.find((p) => qualifies(p) && p.inBox && near(p));
       if (!over) {
         grab.pendingDepth = undefined;
         continue;
