@@ -12,9 +12,29 @@ import {
 } from '@/ui';
 import { CalibrationChecklist } from '@/features/setup/CalibrationChecklist';
 import { thumbsUpCheck } from '@/features/setup/checks';
+import { scriptedRecording } from '@/core/tracking/scripts';
+import { GhostHand } from '@/features/hands/GhostHand';
 import { ThumbsUpPreviewBadge } from '@/features/setup/ThumbsUpBadge';
 
 /** Dev-only gallery of design-system components (route: /dev/ui). */
+const DEMO_PINCH = scriptedRecording(
+  [
+    { at: 0, cx: 0.55, cy: 0.55, pinch: 0 },
+    { at: 500, cx: 0.55, cy: 0.55, pinch: 1 },
+    { at: 1300, cx: 0.4, cy: 0.5, pinch: 1 },
+    { at: 1700, cx: 0.4, cy: 0.5, pinch: 0 },
+  ],
+  { aspect: 16 / 9, label: 'demo: pinch and move' },
+);
+const DEMO_POINT = scriptedRecording(
+  [
+    { at: 0, cx: 0.5, cy: 0.6, pinch: 0 },
+    { at: 400, cx: 0.5, cy: 0.55, pinch: 0, point: true },
+    { at: 1400, cx: 0.5, cy: 0.55, pinch: 0, point: true },
+  ],
+  { aspect: 16 / 9, handedness: 'Left', label: 'demo: point' },
+);
+
 export function UiGallery() {
   const [smoothing, setSmoothing] = useState(0.5);
   const [reduced, setReduced] = useState(false);
@@ -83,6 +103,17 @@ export function UiGallery() {
       </GlassPanel>
       <GlassPanel className="relative h-40 overflow-hidden">
         <ThumbsUpPreviewBadge progress={0.6} />
+      </GlassPanel>
+      <GlassPanel className="space-y-4 p-5">
+        <p className="text-[12px] tracking-[0.18em] text-ink-3 uppercase">Demo hands</p>
+        <div className="grid grid-cols-2 gap-4">
+          <GhostHand
+            recording={DEMO_PINCH}
+            label="Pinch and move to the right"
+            className="h-40 w-full"
+          />
+          <GhostHand recording={DEMO_POINT} label="Point and hold still" className="h-40 w-full" />
+        </div>
       </GlassPanel>
     </main>
   );
