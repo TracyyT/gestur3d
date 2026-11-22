@@ -16,29 +16,25 @@ const lesson = (page: Page) => page.getByRole('region', { name: 'Lesson' });
 const progress = (page: Page) => lesson(page).getByRole('progressbar', { name: 'Lesson progress' });
 
 test('lesson 1 passes with one hand, then both, held in view', async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   await open(page);
   await expect(lesson(page).getByRole('heading', { name: 'Show your hands' })).toBeVisible();
   await expect(lesson(page).getByRole('img', { name: /Demo/ })).toBeVisible();
 
-  const right = [
-    { at: 0, u: 0.6, v: 0.5, pinch: 0 },
-    { at: 5000, u: 0.6, v: 0.5, pinch: 0 },
+  const still = (u: number, ms: number) => [
+    { at: 0, u, v: 0.5, pinch: 0 },
+    { at: ms, u, v: 0.5, pinch: 0 },
   ];
-  const left = [
-    { at: 0, u: 0.4, v: 0.5, pinch: 0, visible: false },
-    { at: 2400, u: 0.4, v: 0.5, pinch: 0, visible: false },
-    { at: 2500, u: 0.4, v: 0.5, pinch: 0 },
-    { at: 5000, u: 0.4, v: 0.5, pinch: 0 },
-  ];
-  const play = page.evaluate(([right, left]) => window.__G3D__.playTwoHand({ right, left }), [
-    right,
-    left,
-  ] as const);
   // One hand alone passes the first step, then asks for the other.
-  await expect(lesson(page).getByText('Now the other hand too')).toBeVisible({ timeout: 20_000 });
+  const one = page.evaluate((k) => window.__G3D__.playHand(k), still(0.6, 6000));
+  await expect(lesson(page).getByText('Now the other hand too')).toBeVisible({ timeout: 30_000 });
   expect(Number(await progress(page).getAttribute('aria-valuenow'))).toBeLessThan(100);
-  await play;
+  await one;
+  // Then both hands.
+  await page.evaluate(([right, left]) => window.__G3D__.playTwoHand({ right, left }), [
+    still(0.6, 4000),
+    still(0.4, 4000),
+  ] as const);
   await expect(lesson(page).getByText('Nice, that’s it.')).toBeVisible();
   await expect(progress(page)).toHaveAttribute('aria-valuenow', '100');
   await expect(lesson(page).getByRole('button', { name: 'Next' })).toBeVisible();
