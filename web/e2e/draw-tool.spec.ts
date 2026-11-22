@@ -3,6 +3,9 @@ import type { HandKey } from './support/g3d';
 
 /** The Draw tool, driven by scripted hands through the real pipeline. */
 
+// CI renders on a slow software GPU; mouse events wait on frames there.
+test.describe.configure({ timeout: 90_000 });
+
 async function open(page: Page) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript(() => {
@@ -113,12 +116,11 @@ test.describe('mouse drawing', () => {
     const at = (u: number, v: number) => [r.left + u * r.width, r.top + v * r.height] as const;
     await page.mouse.move(...at(from.u, from.v));
     await page.mouse.down();
-    for (let i = 1; i <= 20; i++) {
-      const t = i / 20;
+    for (let i = 1; i <= 10; i++) {
+      const t = i / 10;
       await page.mouse.move(
         ...at(from.u + (to.u - from.u) * t, from.v + (to.v - from.v) * t + 0.03 * Math.sin(t * 6)),
       );
-      await page.waitForTimeout(16);
     }
     await page.mouse.up();
   }
