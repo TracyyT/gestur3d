@@ -159,3 +159,38 @@ test.describe('mouse drawing', () => {
     expect(Math.abs(after.u - sphere.u)).toBeGreaterThan(0.01);
   });
 });
+
+test('the hand reaches past the scene edge to the window edge, and draws there', async ({
+  page,
+}) => {
+  await open(page);
+  const before = await count(page);
+  const rect = await page.evaluate(() => window.__G3D__.sceneRect());
+  const width = await page.evaluate(() => window.innerWidth);
+  expect(rect.left + rect.width).toBeLessThan(width - 100); // side panels take the right edge
+  await page.getByRole('button', { name: 'Draw' }).click();
+  // Sweep from inside the scene to 22% of its width past its right edge (still inside the window).
+  const play = page.evaluate(
+    (k) => window.__G3D__.playHand(k),
+    [
+      { at: 0, u: 0.7, v: 0.75, pinch: 0 },
+      { at: 300, u: 0.7, v: 0.75, pinch: 0 },
+      { at: 450, u: 0.7, v: 0.75, pinch: 1 },
+      { at: 1300, u: 1.22, v: 0.75, pinch: 1 },
+      { at: 1700, u: 1.22, v: 0.75, pinch: 1 },
+      { at: 1850, u: 1.22, v: 0.75, pinch: 0 },
+      { at: 2100, u: 1.22, v: 0.75, pinch: 0 },
+    ],
+  );
+  await expect
+    .poll(() => page.evaluate(() => window.__G3D__.pointers()[0]?.screen.x ?? 0))
+    .toBeGreaterThan(rect.left + rect.width * 1.15);
+  const cursor = await page.evaluate(() => window.__G3D__.pointers()[0]!);
+  expect(cursor.inBox).toBe(true);
+  await play;
+  await expect.poll(() => count(page)).toBe(before + 1);
+  // Pinned at the old edge, the drawing's center would be at most u 0.85.
+  const id = await page.evaluate(() => window.__G3D__.objects().at(-1)!.id);
+  const uv = (await page.evaluate((id) => window.__G3D__.objectUV(id), id))!;
+  expect(uv.u).toBeGreaterThan(0.9);
+});

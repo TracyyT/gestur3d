@@ -7,7 +7,12 @@ import {
   type PointerInput,
   type SceneQuery,
 } from '@/core/interaction/handInteraction';
-import { cameraToScreen, interactionBox, screenToNdc } from '@/core/interaction/handMapping';
+import {
+  cameraToScreen,
+  extendBox,
+  interactionBox,
+  screenToNdc,
+} from '@/core/interaction/handMapping';
 import { HandTracker, type TrackSnapshot } from '@/core/tracking/handTracker';
 import type { HandFrame } from '@/core/vision/types';
 import { handRuntime } from '@/features/hands/handRuntime';
@@ -111,7 +116,13 @@ export function HandController() {
     const aspect = useHandTracking.getState().cameraAspect;
     const hud = useHudLayout.getState();
     const rect = visibleSceneRect(hud.panelsVisible, size.width, size.height, hud.leftInset);
-    const box = interactionBox(settings.handReach, aspect, rect.width / rect.height);
+    // Aligned to the scene rect, then extended so the cursor reaches the whole canvas.
+    const box = extendBox(
+      interactionBox(settings.handReach, aspect, rect.width / rect.height),
+      rect,
+      { left: 0, top: 0, width: size.width, height: size.height },
+    );
+    const canvas = { left: 0, top: 0, width: size.width, height: size.height };
 
     const { raycaster, ndc, plane, v, n, right, up, back, bounds, sphere } = tools;
     state.camera.matrixWorld.extractBasis(right, up, back);
@@ -160,8 +171,8 @@ export function HandController() {
     const toInputs = (tracks: TrackSnapshot[], edges: boolean): PointerInput[] =>
       tracks.map((t) => {
         const muted = useMenu.getState().open && !holding.has(t.id);
-        const mapped = cameraToScreen(t.anchor, box, rect);
-        const tip = cameraToScreen(t.tip, box, rect);
+        const mapped = cameraToScreen(t.anchor, box, canvas);
+        const tip = cameraToScreen(t.tip, box, canvas);
         return {
           id: t.id,
           handedness: t.handedness,
