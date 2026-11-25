@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { interactionBox } from '@/core/interaction/handMapping';
+import { extendBox, interactionBox } from '@/core/interaction/handMapping';
 import type { HandFrame } from '@/core/vision/types';
 import { HandOverlay } from '@/features/camera/HandOverlay';
 import { visibleSceneRect } from '@/scene/framing';
@@ -30,8 +30,15 @@ export function PreviewDebugOverlay() {
     };
   }, [source]);
 
-  const rect = visibleSceneRect(panels, window.innerWidth, window.innerHeight);
-  const box = interactionBox(reach, aspect, rect.width / rect.height);
+  const leftInset = useHudLayout((s) => s.leftInset);
+  const rect = visibleSceneRect(panels, window.innerWidth, window.innerHeight, leftInset);
+  // The whole reachable area: the box aligned to the scene, extended to the window.
+  const box = extendBox(interactionBox(reach, aspect, rect.width / rect.height), rect, {
+    left: 0,
+    top: 0,
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
 
   return (
     <>

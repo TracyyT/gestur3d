@@ -6,7 +6,8 @@
  * 3. The "interaction box" is a centered sub-region of the camera frame
  *    (`reach` = its size as a fraction of the frame), cropped to the target
  *    rect's aspect ratio so horizontal and vertical motion scale equally.
- * 4. The box maps linearly onto the visible scene rect (left of the panels).
+ * 4. The box maps linearly onto the visible scene rect (between the panels),
+ *    and extends at the same scale to the window's edges (extendBox).
  *
  * Screen → 3D ray happens in the scene layer using the same camera projection
  * as rendering, so hand picking matches mouse picking exactly.
@@ -53,6 +54,22 @@ export function interactionBox(reach: number, cameraAspect: number, targetAspect
   else h = w / targetAspect;
   const bw = w / cameraAspect;
   return { x0: 0.5 - bw / 2, x1: 0.5 + bw / 2, y0: 0.5 - h / 2, y1: 0.5 + h / 2 };
+}
+
+/**
+ * Grow `box` (aligned to `rect`) so it covers all of `bounds` at the same
+ * scale. The scene stays centered under the hands, and the cursor can still
+ * reach past the scene rect to the window's edges (behind side panels).
+ */
+export function extendBox(box: Box, rect: Rect, bounds: Rect): Box {
+  const sx = (box.x1 - box.x0) / rect.width;
+  const sy = (box.y1 - box.y0) / rect.height;
+  return {
+    x0: box.x0 - (rect.left - bounds.left) * sx,
+    x1: box.x1 + (bounds.left + bounds.width - (rect.left + rect.width)) * sx,
+    y0: box.y0 - (rect.top - bounds.top) * sy,
+    y1: box.y1 + (bounds.top + bounds.height - (rect.top + rect.height)) * sy,
+  };
 }
 
 /** Map a raw (unmirrored) camera point to screen pixels inside `rect`. */

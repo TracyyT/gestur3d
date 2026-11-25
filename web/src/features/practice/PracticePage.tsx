@@ -1,91 +1,76 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { useEffect } from 'react';
 import { createInitialScene } from '@/core/interaction/sceneModel';
-import { LESSONS, type Lesson } from '@/core/practice/lessons';
+import { PracticeTracker, type TaskId } from '@/core/practice/tasks';
+import { onMenuAction, useMenu } from '@/features/menu/menuStore';
 import { borrowScene } from '@/features/modes/borrowScene';
 import { ModeShell } from '@/features/modes/ModeShell';
 import { sessionLog } from '@/features/session/session';
-import { useScene } from '@/stores/scene';
-import { Button, GlassPanel, buttonClasses } from '@/ui';
-import { LessonCard } from './LessonCard';
-import { practiceDone, usePractice } from './practiceStore';
-import { useLessonRunner } from './useLessonRunner';
+import { CAMERA_POSITION } from '@/scene/camera';
+import { useHudLayout } from '@/stores/hudLayout';
+import { onSceneChange, useScene } from '@/stores/scene';
+import { PracticePanel } from './PracticePanel';
+import { usePractice } from './practiceStore';
 
-function FreePractice({ onRestart }: { onRestart: () => void }) {
-  const done = practiceDone(usePractice((s) => s.completed));
+/** Fresh practice objects, and a tracker that ticks tasks off as hands do them. */
+function usePracticeTracking() {
+  const complete = usePractice((s) => s.complete);
   useEffect(() => {
+    const release = borrowScene();
     useScene.setState({ ...createInitialScene(), undoStack: [] });
-    sessionLog.add({ type: 'mark', name: 'free-practice' });
-  }, []);
-  return (
-    <GlassPanel
-      role="region"
-      aria-label="Free practice"
-      className="pointer-events-auto absolute top-[68px] left-4 z-20 w-[320px] space-y-3 p-5"
-    >
-      <p className="text-[11px] tracking-[0.16em] text-ink-3 uppercase">Free practice</p>
-      <h2 className="text-[17px] font-semibold">
-        {done ? 'You’ve got the basics' : 'Try anything'}
-      </h2>
-      <p className="text-[13px] leading-relaxed text-ink-2">
-        Everything is unlocked here: grab, resize, rotate, draw and use the menu. Nothing you do
-        here changes your workspace.
-      </p>
-      <div className="flex items-center gap-2 pt-1">
-        <Button size="sm" variant="ghost" onClick={onRestart}>
-          Back to lessons
-        </Button>
-        <span className="flex-1" />
-        <Link to="/workspace" className={buttonClasses('primary', 'sm')}>
-          Go to Workspace
-        </Link>
-      </div>
-    </GlassPanel>
-  );
+    const tracker = new PracticeTracker(useScene.getState(), CAMERA_POSITION);
+    const record = (ids: TaskId[]) => {
+      if (!ids.length) return;
+      complete(ids);
+      for (const id of ids) sessionLog.add({ type: 'mark', name: 'task-done', detail: id });
+    };
+    const offScene = onSceneChange((c) => {
+      if (c.kind === 'undo') tracker.rebase(useScene.getState());
+      else record(tracker.command(c.cmd, c.source, useScene.getState()));
+    });
+    const offAction = onMenuAction((action) =>
+      record(tracker.menuAction(action, useMenu.getState().openedBy)),
+    );
+    const offMenu = useMenu.subscribe((s, prev) => {
+      if (s.open && !prev.open && s.openedBy) record(tracker.menuOpened(s.openedBy));
+    });
+    // Start over: fresh objects, and every task can tick again.
+    const offReset = usePractice.subscribe((s, prev) => {
+      if (s.done.length || !prev.done.length) return;
+      useScene.setState({ ...createInitialScene(), undoStack: [] });
+      tracker.done.clear();
+      tracker.rebase(useScene.getState());
+      sessionLog.add({ type: 'mark', name: 'practice-reset' });
+    });
+    return () => {
+      offScene();
+      offAction();
+      offMenu();
+      offReset();
+      release();
+    };
+  }, [complete]);
 }
 
-/** Practice mode: short lessons with live feedback, then free practice. */
+/** The checklist's width plus its margin: the scene frames to its right. */
+const PANEL_INSET_PX = 16 + 340;
+
+/** Practice mode: try each gesture on a scratch scene; each one ticks off when it works. */
 export function PracticePage() {
-  // Practice uses its own scene; the workspace's comes back on leaving.
-  useEffect(borrowScene, []);
-  const { current, completed, goTo, complete, skip } = usePractice();
-  const [attempt, setAttempt] = useState(0);
-  const free = current >= LESSONS.length;
-  const lesson: Lesson | null = free ? null : LESSONS[current]!;
-
-  const onDone = useCallback((l: Lesson) => complete(l.id), [complete]);
-  const state = useLessonRunner(lesson, attempt, onDone);
-
-  const go = (i: number) => {
-    goTo(i);
-    setAttempt((n) => n + 1);
-  };
+  usePracticeTracking();
+  useEffect(() => {
+    useHudLayout.getState().setLeftInset(PANEL_INSET_PX);
+    return () => useHudLayout.getState().setLeftInset(0);
+  }, []);
+  const done = usePractice((s) => s.done);
+  const reset = usePractice((s) => s.reset);
 
   return (
     <ModeShell
       mode="practice"
-      sceneLabel="Practice. The lesson panel is on the left; question mark for controls."
-      hud={{ objects: free, drawButton: free }}
+      sceneLabel="Practice. The checklist is on the left; question mark for controls."
+      hud={{ objects: false }}
     >
-      {lesson ? (
-        <LessonCard
-          lesson={lesson}
-          index={current}
-          state={state}
-          completed={completed}
-          onPrevious={() => go(current - 1)}
-          onNext={() => go(current + 1)}
-          onRetry={() => setAttempt((n) => n + 1)}
-          onSkip={() => {
-            skip(lesson.id);
-            sessionLog.add({ type: 'mark', name: 'lesson-skip', detail: lesson.id });
-            go(current + 1);
-          }}
-          onJump={go}
-        />
-      ) : (
-        <FreePractice onRestart={() => go(0)} />
-      )}
+      <PracticePanel done={done} onReset={reset} />
     </ModeShell>
   );
 }

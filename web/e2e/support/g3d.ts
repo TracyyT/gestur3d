@@ -19,6 +19,8 @@ export interface G3D {
     id: number;
     phase: string;
     grabbedId: string | null;
+    screen: { x: number; y: number };
+    inBox: boolean;
     tip?: { x: number; y: number };
   }>;
   twoHand(): Array<{

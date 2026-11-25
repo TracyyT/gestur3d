@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { cameraToScreen, interactionBox, screenToCamera, screenToNdc } from './handMapping';
+import {
+  cameraToScreen,
+  extendBox,
+  interactionBox,
+  screenToCamera,
+  screenToNdc,
+} from './handMapping';
 
 const CAM = 16 / 9;
 const PANEL = 312;
@@ -113,5 +119,38 @@ describe('screenToCamera', () => {
       expect(p.u).toBeCloseTo(u);
       expect(p.v).toBeCloseTo(v);
     }
+  });
+});
+
+describe('extendBox', () => {
+  const box = interactionBox(0.7, 16 / 9, 772 / 900);
+  const rect = { left: 356, top: 0, width: 772, height: 900 };
+  const canvas = { left: 0, top: 0, width: 1440, height: 900 };
+  const ext = extendBox(box, rect, canvas);
+
+  it('maps points inside the scene rect exactly as before', () => {
+    for (const [u, v] of [
+      [0, 0],
+      [0.5, 0.5],
+      [1, 1],
+      [0.2, 0.8],
+    ] as const) {
+      const raw = screenToCamera(u, v, box);
+      const a = cameraToScreen(raw, box, rect);
+      const b = cameraToScreen(raw, ext, canvas);
+      expect(b.x).toBeCloseTo(a.x, 6);
+      expect(b.y).toBeCloseTo(a.y, 6);
+    }
+  });
+
+  it('lets the cursor reach both window edges instead of pinning at the scene edge', () => {
+    const right = cameraToScreen(screenToCamera(1.3, 0.5, box), ext, canvas);
+    expect(right.x).toBeGreaterThan(rect.left + rect.width);
+    expect(right.inBox).toBe(true);
+    const farRight = cameraToScreen([1 - ext.x1 - 0.01, 0.5], ext, canvas);
+    expect(farRight.x).toBe(1440);
+    expect(farRight.inBox).toBe(false);
+    const left = cameraToScreen([1 - ext.x0 - 0.001, 0.5], ext, canvas);
+    expect(left.x).toBeLessThan(5);
   });
 });

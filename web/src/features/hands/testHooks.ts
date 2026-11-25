@@ -55,11 +55,8 @@ export interface TwoHandScript {
 const ASPECT = 16 / 9;
 
 function sceneRect() {
-  return visibleSceneRect(
-    useHudLayout.getState().panelsVisible,
-    window.innerWidth,
-    window.innerHeight,
-  );
+  const hud = useHudLayout.getState();
+  return visibleSceneRect(hud.panelsVisible, window.innerWidth, window.innerHeight, hud.leftInset);
 }
 
 /** Raw camera wrist position that puts the cursor at a scene-rect UV. */

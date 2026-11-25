@@ -12,11 +12,12 @@ import { computeFraming, type Framing } from './framing';
  */
 export function PanelAwareFraming({ instant }: { instant: boolean }) {
   const panelsVisible = useHudLayout((s) => s.panelsVisible);
+  const leftInset = useHudLayout((s) => s.leftInset);
   const state = useRef<Framing>({ offsetX: 0, zoom: 1 });
 
   useFrame(({ camera, size }, delta) => {
     const cam = camera as PerspectiveCamera;
-    const target = computeFraming(panelsVisible, size.width, size.height);
+    const target = computeFraming(panelsVisible, size.width, size.height, leftInset);
     const k = instant ? 1 : Math.min(1, delta * 8);
     const ease = (from: number, to: number, eps: number) => {
       const v = from + (to - from) * k;

@@ -35,19 +35,36 @@ export function panelsReserveSpace(panelsVisible: boolean, width: number) {
   return panelsVisible && width >= MIN_REFRAME_WIDTH_PX;
 }
 
-/** The part of the canvas where the scene is framed (left of the panels). */
-export function visibleSceneRect(panelsVisible: boolean, width: number, height: number): Rect {
-  const w = panelsReserveSpace(panelsVisible, width) ? width - PANEL_COVER_PX : width;
-  return { left: 0, top: 0, width: w, height };
+/**
+ * The part of the canvas where the scene is framed: right of a mode's left
+ * panel (`leftInset` px, e.g. Practice's checklist) and left of the side panels.
+ */
+export function visibleSceneRect(
+  panelsVisible: boolean,
+  width: number,
+  height: number,
+  leftInset = 0,
+): Rect {
+  const roomy = width >= MIN_REFRAME_WIDTH_PX;
+  const left = roomy ? leftInset : 0;
+  const right = panelsReserveSpace(panelsVisible, width) ? PANEL_COVER_PX : 0;
+  return { left, top: 0, width: width - left - right, height };
 }
 
 /**
  * Where the scene should sit: centered in the visible scene rect, and zoomed
  * out just enough for the default layout to fit.
  */
-export function computeFraming(panelsVisible: boolean, width: number, height: number): Framing {
-  const free = visibleSceneRect(panelsVisible, width, height).width;
+export function computeFraming(
+  panelsVisible: boolean,
+  width: number,
+  height: number,
+  leftInset = 0,
+): Framing {
+  const r = visibleSceneRect(panelsVisible, width, height, leftInset);
   const needed = height * CONTENT_WIDTH_PER_HEIGHT;
-  const zoom = Math.min(1, Math.max(MIN_ZOOM, free / needed));
-  return { offsetX: panelsReserveSpace(panelsVisible, width) ? PANEL_COVER_PX / 2 : 0, zoom };
+  const zoom = Math.min(1, Math.max(MIN_ZOOM, r.width / needed));
+  // Shift so the scene's center lands in the middle of the free rect.
+  const offsetX = width / 2 - (r.left + r.width / 2);
+  return { offsetX, zoom };
 }

@@ -12,6 +12,7 @@ import { HandController } from './HandController';
 import { LiveStrokes } from './LiveStrokes';
 import { MouseDrawing } from './MouseDrawing';
 import { PanelAwareFraming } from './PanelAwareFraming';
+import { CAMERA_POSITION } from './camera';
 import { HoloObject } from './objects/HoloObject';
 
 function SceneObjects({
@@ -64,7 +65,7 @@ export default function SceneCanvas({ children }: { children?: ReactNode }) {
   return (
     <Canvas
       dpr={dpr}
-      camera={{ position: [0, 2.3, 7.4], fov: 42, near: 0.1, far: 60 }}
+      camera={{ position: CAMERA_POSITION, fov: 42, near: 0.1, far: 60 }}
       gl={{ antialias: false, powerPreference: 'high-performance' }}
       onPointerMissed={(e) => {
         if (e.button === 0) dispatch({ type: 'select', id: null }, 'mouse');
