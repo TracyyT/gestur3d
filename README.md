@@ -31,6 +31,17 @@ Other commands:
 - `pnpm test:e2e` runs the Playwright tests with scripted hands
 - `cd ml && uv sync && uv run pytest` runs the Python checks
 
+## Deploy
+
+The app is a static site, set up for Vercel in `web/vercel.json`.
+
+1. Import the repo in Vercel and set **Root Directory** to `web`. Everything else comes from `vercel.json`.
+2. Deploy. The build downloads the hand model and fails if it can't, so a deploy never ships without it.
+
+`vercel.json` also sends every page route to `index.html`, so links like `/practice` work on refresh. It allows the camera on the site's own origin, caches hashed files in `/assets` for a year, and revalidates the model files. Vercel serves over HTTPS, which the camera needs.
+
+To check a production build locally, run `pnpm build && pnpm preview`.
+
 ## Project layout
 
 - `web/` is the React, Three.js and MediaPipe app. Framework-free logic lives in `web/src/core`.
