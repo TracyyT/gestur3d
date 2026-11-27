@@ -7,7 +7,7 @@
  *
  * Runs before `dev` and `build`. A failed download only warns, so the app
  * still builds; camera setup then shows its "model failed to load" state.
- * Set REQUIRE_MODELS=1 (e.g. on Vercel) to make a missing model fatal.
+ * REQUIRE_MODELS=1 (set in CI and vercel.json) makes a missing model fatal.
  */
 import { createWriteStream, existsSync } from 'node:fs';
 import { cp, mkdir, rename, rm, stat } from 'node:fs/promises';
