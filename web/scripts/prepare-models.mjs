@@ -44,25 +44,33 @@ async function copyWasm() {
   console.log(`[models] copied MediaPipe wasm runtime (${WASM_FILES.length} files)`);
 }
 
+const ATTEMPTS = 2;
+const TIMEOUT_MS = 60_000;
+
 async function download({ file, url }) {
   const dest = join(outDir, file);
   if (existsSync(dest) && (await stat(dest)).size > 0) {
     console.log(`[models] ${file} present`);
     return true;
   }
-  try {
-    const res = await fetch(url);
-    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-    const tmp = `${dest}.part`;
-    await pipeline(Readable.fromWeb(res.body), createWriteStream(tmp));
-    await rename(tmp, dest);
-    const { size } = await stat(dest);
-    console.log(`[models] downloaded ${file} (${(size / 1e6).toFixed(1)} MB)`);
-    return true;
-  } catch (err) {
-    console.warn(`[models] could not download ${file}: ${err.message}`);
-    return false;
+  const tmp = `${dest}.part`;
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      await pipeline(Readable.fromWeb(res.body), createWriteStream(tmp));
+      await rename(tmp, dest);
+      const { size } = await stat(dest);
+      console.log(`[models] downloaded ${file} (${(size / 1e6).toFixed(1)} MB)`);
+      return true;
+    } catch (err) {
+      await rm(tmp, { force: true });
+      console.warn(
+        `[models] could not download ${file} (try ${attempt}/${ATTEMPTS}): ${err.message}`,
+      );
+    }
   }
+  return false;
 }
 
 await mkdir(outDir, { recursive: true });

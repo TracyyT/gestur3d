@@ -26,6 +26,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+        env:
+          REQUIRE_MODELS: '1'
 
   e2e:
     name: Web (Playwright smoke)
@@ -41,6 +43,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @gestur3d/web exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+        env:
+          REQUIRE_MODELS: '1'
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
